@@ -9,3 +9,4 @@ movie_system
 
 # OS files
 .DS_Store
+*.pdf
