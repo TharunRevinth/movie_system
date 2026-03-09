@@ -1,0 +1,11 @@
+# Binaries
+a.out
+movie_system
+*.o
+
+# Emscripten Outputs (keeping for now as requested, but usually rebuilt)
+# index.js
+# index.wasm
+
+# OS files
+.DS_Store
