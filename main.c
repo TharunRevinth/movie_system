@@ -6,6 +6,7 @@
 #include <emscripten.h>
 #define DATA_PATH "/data/"
 #else
+#include <unistd.h>
 #define DATA_PATH "./"
 #define EMSCRIPTEN_KEEPALIVE
 #endif
@@ -43,6 +44,35 @@ void loadData();
 
 // --- Core Logic Functions ---
 
+void syncToGit() {
+#ifndef __EMSCRIPTEN__
+    printf("\n[SYNC] Preparing to push data to Git...\n");
+    // Check if git is available
+    if (system("git --version > /dev/null 2>&1") != 0) {
+        printf("[ERROR] Git is not installed or not in PATH.\n");
+        return;
+    }
+    
+    // Commands to add data files, commit and push
+    printf("[SYNC] Committing changes...\n");
+    system("git add shows.dat bookings.dat > /dev/null 2>&1");
+    int ret = system("git commit -m \"Update movie data from terminal\" > /dev/null 2>&1");
+    
+    if (ret != 0) {
+        printf("[INFO] No new changes to commit or commit failed.\n");
+    }
+
+    printf("[SYNC] Pushing to remote (this may take a moment)...\n");
+    ret = system("git push > /dev/null 2>&1");
+    
+    if (ret == 0) {
+        printf("[SUCCESS] Data pushed to Git! Web version will update after deployment.\n");
+    } else {
+        printf("[ERROR] Git push failed. Ensure you have a remote configured (git remote add origin ...)\n");
+    }
+#endif
+}
+
 void saveData() {
     char path1[128], path2[128];
     sprintf(path1, "%sshows.dat", DATA_PATH);
@@ -76,9 +106,33 @@ void EMSCRIPTEN_KEEPALIVE loadData() {
     memset(shows, 0, sizeof(shows));
     memset(bookings, 0, sizeof(bookings));
 
+    // 1. Try loading from the Persistent Virtual Storage (IDBFS)
     FILE *f1 = fopen(path1, "rb");
-    if (f1) { if (fread(&num_shows, sizeof(int), 1, f1) == 1) { if (num_shows > 0) fread(shows, sizeof(Show), num_shows, f1); } fclose(f1); }
+    if (f1) { 
+        if (fread(&num_shows, sizeof(int), 1, f1) == 1 && num_shows > 0) {
+            fread(shows, sizeof(Show), num_shows, f1);
+        }
+        fclose(f1); 
+    }
     
+    // 2. Fallback: If IDBFS is empty, try loading from the bundled files (pushed via Git)
+    // In Emscripten, bundled files are usually in the root "/" or same dir
+    if (num_shows <= 0) {
+#ifdef __EMSCRIPTEN__
+        FILE *f_fallback = fopen("/shows.dat", "rb");
+        if (!f_fallback) f_fallback = fopen("shows.dat", "rb"); // Try current dir too
+
+        if (f_fallback) {
+            if (fread(&num_shows, sizeof(int), 1, f_fallback) == 1 && num_shows > 0) {
+                fread(shows, sizeof(Show), num_shows, f_fallback);
+                printf("MSG|Loaded initial data from Git sync.\n");
+            }
+            fclose(f_fallback);
+        }
+#endif
+    }
+
+    // 3. Final Fallback: Hardcoded defaults if everything else fails
     if (num_shows <= 0) {
         num_shows = 3;
         shows[0].show_id = 1; strcpy(shows[0].movie_name, "Inception"); strcpy(shows[0].timing, "10:00 AM"); shows[0].price = 150.0;
@@ -87,8 +141,25 @@ void EMSCRIPTEN_KEEPALIVE loadData() {
         saveData();
     }
 
+    // Load bookings (following same logic)
     FILE *f2 = fopen(path2, "rb");
-    if (f2) { if (fread(&num_bookings, sizeof(int), 1, f2) == 1) { if (num_bookings > 0) fread(bookings, sizeof(Booking), num_bookings, f2); } fclose(f2); }
+    if (f2) { 
+        if (fread(&num_bookings, sizeof(int), 1, f2) == 1 && num_bookings > 0) {
+            fread(bookings, sizeof(Booking), num_bookings, f2);
+        }
+        fclose(f2); 
+    } else {
+#ifdef __EMSCRIPTEN__
+        FILE *f2_fallback = fopen("/bookings.dat", "rb");
+        if (!f2_fallback) f2_fallback = fopen("bookings.dat", "rb");
+        if (f2_fallback) {
+            if (fread(&num_bookings, sizeof(int), 1, f2_fallback) == 1 && num_bookings > 0) {
+                fread(bookings, sizeof(Booking), num_bookings, f2_fallback);
+            }
+            fclose(f2_fallback);
+        }
+#endif
+    }
 }
 
 void EMSCRIPTEN_KEEPALIVE getShows() {
@@ -178,35 +249,70 @@ void EMSCRIPTEN_KEEPALIVE getOccupancyReport() {
 // --- Terminal CLI Version ---
 
 #ifndef __EMSCRIPTEN__
+
+// ANSI Color Codes
+#define COLOR_RESET  "\x1b[0m"
+#define COLOR_BOLD   "\x1b[1m"
+#define COLOR_RED    "\x1b[31m"
+#define COLOR_GREEN  "\x1b[32m"
+#define COLOR_YELLOW "\x1b[33m"
+#define COLOR_BLUE   "\x1b[34m"
+#define COLOR_CYAN   "\x1b[36m"
+#define COLOR_MAGENTA "\x1b[35m"
+
+void clearScreen() {
+    printf("\033[H\033[J");
+}
+
+void pressEnterToContinue() {
+    printf("\n" COLOR_YELLOW "Press Enter to return to menu..." COLOR_RESET);
+    getchar(); // Catch newline
+    getchar(); // Wait for enter
+}
+
 void displayMenu() {
-    printf("\n==== CINEBOOKING TERMINAL ====\n");
-    printf("STORAGE: LOCAL DISK\n");
-    printf("SYNC STATUS: [ NOT SYNCED TO WEB ]\n");
-    printf("NOTE: This is a standalone version. For cloud storage, use the web version.\n");
-    printf("------------------------------\n");
-    printf("1. View Now Showing\n");
-    printf("2. Book Tickets\n");
-    printf("3. View Ticket Receipt\n");
-    printf("4. Cancel Booking\n");
-    printf("5. Occupancy Report\n");
-    printf("6. Exit\n");
-    printf("Choice: ");
+    printf("\n" COLOR_CYAN COLOR_BOLD "╔════════════════════════════════════════╗" COLOR_RESET "\n");
+    printf(COLOR_CYAN COLOR_BOLD "║         CINEBOOKING TERMINAL           ║" COLOR_RESET "\n");
+    printf(COLOR_CYAN COLOR_BOLD "╚════════════════════════════════════════╝" COLOR_RESET "\n");
+    printf(COLOR_BLUE "  STORAGE: " COLOR_RESET "LOCAL DISK (.dat)\n");
+    printf(COLOR_BLUE "  SYNC:    " COLOR_RESET "[ " COLOR_YELLOW "PENDING GIT PUSH" COLOR_RESET " ]\n");
+    printf(COLOR_CYAN "──────────────────────────────────────────" COLOR_RESET "\n");
+    printf("  " COLOR_BOLD "1." COLOR_RESET " View Now Showing\n");
+    printf("  " COLOR_BOLD "2." COLOR_RESET " Book Tickets\n");
+    printf("  " COLOR_BOLD "3." COLOR_RESET " View Ticket Receipt\n");
+    printf("  " COLOR_BOLD "4." COLOR_RESET " Cancel Booking\n");
+    printf("  " COLOR_BOLD "5." COLOR_RESET " Occupancy Report\n");
+    printf("  " COLOR_BOLD "6." COLOR_RESET COLOR_MAGENTA " Sync to Web (Git Push)" COLOR_RESET "\n");
+    printf("  " COLOR_BOLD "7." COLOR_RESET COLOR_RED " Exit" COLOR_RESET "\n");
+    printf(COLOR_CYAN "──────────────────────────────────────────" COLOR_RESET "\n");
+    printf(COLOR_BOLD " Choice: " COLOR_RESET);
 }
 
 int main() {
     loadData();
-    printf("\n[SYSTEM] Local data loaded. Syncing with web: DISABLED\n");
+    clearScreen();
+    printf(COLOR_GREEN "[SYSTEM] Local data loaded successfully." COLOR_RESET "\n");
+    
     int choice, id, seats, r, c;
     char name[64], seat_str[256], temp[32];
 
     while(1) {
         displayMenu();
-        if (scanf("%d", &choice) != 1) { printf("Invalid input!\n"); while(getchar() != '\n'); continue; }
+        if (scanf("%d", &choice) != 1) { 
+            printf(COLOR_RED "Invalid input! Please enter a number." COLOR_RESET "\n"); 
+            while(getchar() != '\n'); 
+            continue; 
+        }
         
         switch(choice) {
             case 1:
-                printf("\n--- MOVIES ---\n");
-                for(int i=0; i<num_shows; i++) printf("[%d] %s (%s) - Rs. %.2f\n", shows[i].show_id, shows[i].movie_name, shows[i].timing, shows[i].price);
+                clearScreen();
+                printf("\n" COLOR_BOLD "--- NOW SHOWING ---" COLOR_RESET "\n");
+                for(int i=0; i<num_shows; i++) 
+                    printf(COLOR_CYAN "[%d]" COLOR_RESET " %-15s " COLOR_YELLOW "(%s)" COLOR_RESET " - Rs. %.2f\n", 
+                           shows[i].show_id, shows[i].movie_name, shows[i].timing, shows[i].price);
+                pressEnterToContinue();
+                clearScreen();
                 break;
             case 2:
                 printf("Enter Movie ID: "); scanf("%d", &id);
@@ -219,23 +325,38 @@ int main() {
                     strcat(seat_str, temp);
                 }
                 bookTickets(id, name, seats, seat_str);
+                pressEnterToContinue();
+                clearScreen();
                 break;
             case 3:
                 printf("Enter Booking ID: "); scanf("%d", &id);
                 viewBooking(id);
+                pressEnterToContinue();
+                clearScreen();
                 break;
             case 4:
                 printf("Enter Booking ID to cancel: "); scanf("%d", &id);
                 cancelBooking(id);
+                pressEnterToContinue();
+                clearScreen();
                 break;
             case 5:
-                printf("\n--- OCCUPANCY ---\n");
+                clearScreen();
+                printf("\n" COLOR_BOLD "--- OCCUPANCY REPORT ---" COLOR_RESET "\n");
                 getOccupancyReport();
+                pressEnterToContinue();
+                clearScreen();
                 break;
             case 6:
-                printf("Exiting...\n");
+                syncToGit();
+                pressEnterToContinue();
+                clearScreen();
+                break;
+            case 7:
+                printf(COLOR_YELLOW "Exiting system. Goodbye!" COLOR_RESET "\n");
                 return 0;
-            default: printf("Invalid choice!\n");
+            default: 
+                printf(COLOR_RED "Invalid choice! Try again." COLOR_RESET "\n");
         }
     }
     return 0;
