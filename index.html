@@ -108,7 +108,13 @@
             </div>
             <div id="receiptArea" style="margin-top: 40px; display: none;"></div>
         </div>
-        <div id="occupancy" class="tab-content"><div class="header"><h1>Occupancy Report</h1></div><div class="box"><table><thead><tr><th>ID</th><th>Movie</th><th>Timing</th><th>Booked</th><th>Occupancy</th></tr></thead><tbody id="occBody"></tbody></table></div></div>
+        <div id="occupancy" class="tab-content">
+            <div class="header" style="display:flex; justify-content:space-between; align-items:center;">
+                <h1>Occupancy Report</h1>
+                <button class="btn btn-outline" onclick="syncFromCloud()">🔄 Sync from Terminal (Cloud)</button>
+            </div>
+            <div class="box"><table><thead><tr><th>ID</th><th>Movie</th><th>Timing</th><th>Booked</th><th>Occupancy</th></tr></thead><tbody id="occBody"></tbody></table></div>
+        </div>
     </div>
 
     <div id="confirm-modal">
@@ -188,6 +194,38 @@
         function fetchReceipt() { const id=document.getElementById('vBookingId').value; if(id) Module.ccall('viewBooking', null, ['number'], [parseInt(id)]); }
         function cancelBooking(id) { if(confirm("Are you sure you want to cancel this booking?")) { setTimeout(() => { Module.ccall('cancelBooking', null, ['number'], [id]); }, 10); } }
         function refreshOccupancy() { const b=document.getElementById('occBody'); if(b) b.innerHTML=""; Module.ccall('getOccupancyReport', null, [], []); }
+
+        async function syncFromCloud() {
+            if(!confirm("This will overwrite your browser's data with the latest files from your Terminal (GitHub). Proceed?")) return;
+            showToast("Syncing from Cloud...");
+            try {
+                // Fetch latest files from origin with cache-busting
+                const res1 = await fetch('shows.dat?nocache=' + new Date().getTime());
+                const res2 = await fetch('bookings.dat?nocache=' + new Date().getTime());
+                if(!res1.ok || !res2.ok) throw new Error("Could not fetch data from server.");
+                
+                const data1 = new Uint8Array(await res1.arrayBuffer());
+                const data2 = new Uint8Array(await res2.arrayBuffer());
+
+                // Write to Emscripten data folder
+                FS.writeFile('/data/shows.dat', data1);
+                FS.writeFile('/data/bookings.dat', data2);
+                
+                // Persist back to IDBFS
+                FS.syncfs(false, function (err) {
+                    if (err) {
+                        showToast("Browser sync failed!");
+                        console.error(err);
+                    } else {
+                        showToast("Sync Successful! Reloading...", true);
+                        setTimeout(() => location.reload(), 1500);
+                    }
+                });
+            } catch(e) {
+                console.error(e);
+                showToast("Sync Failed: " + e.message);
+            }
+        }
     </script>
     <script async src="index.js"></script>
 </body>
