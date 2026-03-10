@@ -15,3 +15,7 @@ node_modules/
 .env
 bun.lock
 
+
+# Local Netlify folder
+.netlify
+dist/
