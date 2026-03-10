@@ -279,6 +279,7 @@
             }
 
             tmdbKey = env['TMDB_API_KEY'];
+            console.log("TMDB Key Loaded:", tmdbKey ? "YES (length " + tmdbKey.length + ")" : "NO");
             if (env['NEXT_PUBLIC_SUPABASE_URL'] && env['NEXT_PUBLIC_SUPABASE_ANON_KEY']) {
                 window.supabaseClient = supabase.createClient(env['NEXT_PUBLIC_SUPABASE_URL'], env['NEXT_PUBLIC_SUPABASE_ANON_KEY']);
                 
