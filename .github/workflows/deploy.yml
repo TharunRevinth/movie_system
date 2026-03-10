@@ -6,6 +6,11 @@ on:
       - nextjs-bun-migration
       - master
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -20,7 +25,7 @@ jobs:
           sed -i "s|SUPABASE_ANON_KEY_PLACEHOLDER|${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}|g" index.html
 
       - name: Setup Pages
-        uses: actions/configure-pages@v4
+        uses: actions/configure-pages@v5
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
