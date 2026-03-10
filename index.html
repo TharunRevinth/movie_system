@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CineBooking | Movie Ticket System</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -13,6 +14,25 @@
         :root { --primary: #E50914; --bg: #141414; --surface: #1F1F1F; --text: #FFFFFF; --muted: #B3B3B3; --border: #333333; --green: #46D369; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); overflow-x: hidden; min-height: 100vh; line-height: 1.5; }
+
+        /* Mobile Optimization */
+        @media (max-width: 768px) {
+            .nav { padding: 0 15px; height: auto; flex-direction: column; gap: 10px; padding-bottom: 10px; position: relative; }
+            .nav-logo { margin-top: 10px; font-size: 1.2rem; }
+            .nav-links { gap: 10px; overflow-x: auto; width: 100%; justify-content: flex-start; padding-bottom: 5px; -webkit-overflow-scrolling: touch; }
+            .nav-item { font-size: 0.8rem; white-space: nowrap; padding: 10px 5px; }
+            .container { padding: 20px 15px; }
+            .header h1 { font-size: 1.6rem; }
+            .card-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 15px; }
+            .movie-info { padding: 12px; }
+            .movie-info h3 { font-size: 1rem; height: 2.4rem; }
+            .seat { width: 22px; height: 22px; }
+            .seat-row { gap: 6px; }
+            .box { padding: 20px; }
+            .modal-inner { padding: 25px; }
+            .id-badge { font-size: 1.5rem; padding: 8px 20px; letter-spacing: 2px; }
+            .receipt-card { padding: 20px; margin: 10px; }
+        }
 
         @media print {
             body { background: white !important; }
@@ -285,15 +305,21 @@
         }
 
         async function fetchTMDBPoster(movieName) {
-            if (!tmdbKey) return null;
+            // Check if it's the placeholder (not yet replaced by GitHub Action)
+            if (!tmdbKey || tmdbKey === 'TMDB_API_KEY_PLACEHOLDER') {
+                console.warn("TMDB Key not available, using placeholder");
+                return `https://via.placeholder.com/500x750/1a1a1a/ffffff?text=${encodeURIComponent(movieName)}`;
+            }
             try {
                 const r = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${tmdbKey}&query=${encodeURIComponent(movieName)}`);
                 const d = await r.json();
                 if (d.results && d.results[0] && d.results[0].poster_path) {
                     return `https://image.tmdb.org/t/p/w500${d.results[0].poster_path}`;
                 }
-            } catch(e) {}
-            return null;
+            } catch(e) {
+                console.error("TMDB Fetch Error:", e);
+            }
+            return `https://via.placeholder.com/500x750/1a1a1a/ffffff?text=${encodeURIComponent(movieName)}`;
         }
 
         async function fetchMovies() {
@@ -436,14 +462,27 @@
             }
         };
 
-        function renderShowsOnGrid() {
+        async function renderShowsOnGrid() {
             const loc = document.getElementById('webLoc').value;
-            const g=document.getElementById('movieGrid'); if(!g) return; g.innerHTML=""; 
+            const g = document.getElementById('movieGrid'); 
+            if(!g) return; 
+            g.innerHTML = "";
+
             const filtered = shows.filter(s => s.region === loc);
-            filtered.forEach(s=>{ 
-                g.innerHTML+=`<div class="movie-card">
+
+            for (const s of filtered) {
+                // If the image is not set or is from TMDB, try to fetch it live if missing
+                let posterSrc = s.img;
+                if (!posterSrc || posterSrc === 'null' || posterSrc === 'undefined') {
+                    posterSrc = await fetchTMDBPoster(s.name);
+                }
+
+                const card = document.createElement('div');
+                card.className = 'movie-card';
+                card.innerHTML = `
                     <div class="movie-poster-wrap">
-                        <img src="${s.img}" class="movie-poster" alt="${s.name}" onerror="this.src='https://via.placeholder.com/300x450?text=${encodeURIComponent(s.name)}'">
+                        <img src="${posterSrc}" class="movie-poster" alt="${s.name}" loading="lazy" 
+                             onerror="this.src='https://via.placeholder.com/300x450?text=${encodeURIComponent(s.name)}'">
                     </div>
                     <div class="movie-info">
                         <h3>${s.name}</h3>
@@ -453,18 +492,20 @@
                             <button class="btn btn-primary" style="padding: 10px 20px" onclick="bookFromMovieTab(${s.id})">Book</button>
                         </div>
                     </div>
-                </div>`; 
-            });
+                `;
+                g.appendChild(card);
+            }
             populateBookDropdown();
         }
 
-        function refreshShows() { 
-            shows=[]; 
-            if(Module.ccall) Module.ccall('getShows', null, [], []); 
-            // Small timeout to ensure parse() catches all outputs from WASM before rendering
-            setTimeout(() => renderShowsOnGrid(), 50); 
-        }
-        
+        function refreshShows() {
+            shows = [];
+            if (window.Module && Module.ccall) {
+                Module.ccall('getShows', null, [], []);
+            }
+            // Increase timeout slightly for WASM output processing
+            setTimeout(() => renderShowsOnGrid(), 100);
+        }        
         function bookFromMovieTab(id) { switchTab('book'); setTimeout(()=>{ document.getElementById('bMovie').value=id; fetchSeats(); }, 50); }
         function populateBookDropdown() { const sel=document.getElementById('bMovie'); if(!sel) return; sel.innerHTML="<option value=''>-- Movie --</option>"; shows.forEach(s=>sel.innerHTML+=`<option value="${s.id}">${s.name}</option>`); }
         async function fetchSeats() { 
