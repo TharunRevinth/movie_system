@@ -4,60 +4,98 @@
     <meta charset="utf-8">
     <title>CineBooking | Movie Ticket System</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/uuid/8.3.2/uuid.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
     <style>
         :root { --primary: #E50914; --bg: #141414; --surface: #1F1F1F; --text: #FFFFFF; --muted: #B3B3B3; --border: #333333; --green: #46D369; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); overflow-x: hidden; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); overflow-x: hidden; min-height: 100vh; line-height: 1.5; }
 
         @media print {
             body { background: white !important; }
-            * { color: black !important; background-color: transparent !important; }
-            nav, .container, #toast, #confirm-modal { display: none !important; }
-            #printable-receipt { display: block !important; position: absolute; top: 0; left: 0; width: 100%; }
-            .receipt-card { box-shadow: none !important; border: 2px solid #000 !important; margin: 20px auto; width: 500px !important; padding: 40px !important; border-radius: 0 !important; }
-            .btn-outline, .btn-danger, .btn-primary { display: none !important; }
+            nav, .container, #toast, #confirm-modal, .no-print { display: none !important; }
+            #receiptArea { display: block !important; width: 100%; margin: 0; padding: 0; }
+            .receipt-card { box-shadow: none !important; border: 2px solid #000 !important; margin: 20px auto; width: 100% !important; max-width: 500px; padding: 40px !important; border-radius: 0 !important; color: black !important; }
+            .receipt-card * { color: black !important; }
+            .btn, .no-print { display: none !important; }
         }
 
         .nav { height: 70px; background: #000000; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 60px; position: sticky; top: 0; z-index: 1000; }
         .nav-logo { font-weight: 800; font-size: 1.4rem; letter-spacing: -0.5px; }
         .nav-logo span { color: var(--primary); }
         .nav-links { display: flex; gap: 32px; height: 100%; }
-        .nav-item { font-size: 0.95rem; font-weight: 600; color: var(--muted); cursor: pointer; border-bottom: 3px solid transparent; display: flex; align-items: center; padding: 0 10px; transition: color 0.2s; }
+        .nav-item { font-size: 0.95rem; font-weight: 600; color: var(--muted); cursor: pointer; border-bottom: 3px solid transparent; display: flex; align-items: center; padding: 0 10px; transition: all 0.2s; }
         .nav-item.active { color: var(--text); border-bottom-color: var(--primary); }
-        .container { max-width: 1100px; margin: 0 auto; padding: 48px 60px; }
-        .header { margin-bottom: 30px; }
+        
+        .container { max-width: 1200px; margin: 0 auto; padding: 48px 60px; }
+        .header { margin-bottom: 40px; }
         .header h1 { font-size: 2.2rem; font-weight: 800; }
-        .tab-content { display: none; animation: fadeIn 0.3s ease; }
-        .tab-content.active { display: block; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 24px; }
-        .movie-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; }
-        .movie-card h3 { font-size: 1.4rem; margin-bottom: 8px; font-weight: 800; }
-        .movie-card p { color: var(--muted); font-size: 0.95rem; margin-bottom: 16px; }
-        .btn { padding: 12px 24px; border-radius: 8px; font-weight: 700; font-size: 0.9rem; cursor: pointer; border: none; transition: 0.2s; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        
+        .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 32px; padding-bottom: 40px; }
+        .movie-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; height: 100%; transition: transform 0.3s, border-color 0.3s, box-shadow 0.3s; position: relative; }
+        .movie-card:hover { transform: translateY(-10px); border-color: var(--primary); box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.6); }
+        .movie-poster-wrap { width: 100%; aspect-ratio: 2/3; background: #1a1a1a; overflow: hidden; position: relative; }
+        .movie-poster { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.5s; }
+        .movie-card:hover .movie-poster { transform: scale(1.05); }
+        .movie-info { padding: 20px; display: flex; flex-direction: column; flex-grow: 1; gap: 12px; }
+        .movie-info h3 { font-size: 1.2rem; font-weight: 800; color: white; line-height: 1.2; margin: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; height: 2.8rem; }
+        .movie-info p { color: var(--muted); font-size: 0.85rem; font-weight: 600; margin: 0; }
+        
+        .price-tag { font-size: 1.2rem; font-weight: 900; color: var(--text); }
+        .price-tag span { color: var(--primary); font-size: 0.9rem; margin-right: 2px; }
+        
+        .btn { padding: 12px 24px; border-radius: 8px; font-weight: 700; font-size: 0.9rem; cursor: pointer; border: none; transition: 0.2s; text-align: center; outline: none; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover:not(:disabled) { background: #ff0f1a; }
         .btn-outline { background: transparent; color: white; border: 1px solid var(--border); }
+        .btn-outline:hover:not(:disabled) { background: rgba(255,255,255,0.05); border-color: var(--muted); }
         .btn-danger { background: #E50914; color: white; }
-        .form-group { margin-bottom: 20px; }
-        .form-group label { display: block; font-weight: 600; font-size: 0.9rem; margin-bottom: 8px; color: var(--muted); }
-        input, select { width: 100%; padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; font-size: 1rem; color: white; outline: none; }
-        .box { background: var(--surface); border-radius: 16px; border: 1px solid var(--border); padding: 32px; }
-        table { width: 100%; border-collapse: collapse; }
-        th { text-align: left; padding: 16px; font-size: 0.85rem; color: var(--muted); text-transform: uppercase; border-bottom: 1px solid var(--border); }
-        td { padding: 16px; font-size: 0.95rem; border-bottom: 1px solid var(--border); }
-        .screen { height: 40px; background: linear-gradient(to bottom, #555, transparent); margin: 0 auto 30px; border-top-left-radius: 50%; border-top-right-radius: 50%; text-align: center; color: var(--muted); font-size: 0.8rem; line-height: 20px; font-weight: 800; }
-        .seats-container { display: flex; flex-direction: column; gap: 10px; align-items: center; margin-bottom: 30px; }
+        
+        .box { background: var(--surface); border-radius: 12px; border: 1px solid var(--border); padding: 32px; }
+        input, select { width: 100%; padding: 14px; background: #141414; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem; color: white; outline: none; margin-bottom: 15px; transition: border-color 0.2s; }
+        input:focus, select:focus { border-color: var(--primary); }
+        
+        .screen { height: 40px; background: linear-gradient(to bottom, #444, transparent); margin: 0 auto 40px; border-top-left-radius: 50%; border-top-right-radius: 50%; text-align: center; color: var(--muted); font-size: 0.8rem; line-height: 20px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; }
+        .seats-container { display: flex; flex-direction: column; gap: 10px; align-items: center; padding: 20px; background: rgba(0,0,0,0.2); border-radius: 12px; }
         .seat-row { display: flex; gap: 10px; }
-        .seat { width: 35px; height: 35px; background: #333; border-radius: 6px; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 800; position: relative; }
-        .seat:hover::after { content: attr(data-label); position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); background: #000; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 0.6rem; white-space: nowrap; pointer-events: none; z-index: 10; }
-        .seat.selected { background: var(--green); }
-        .seat.booked { background: var(--primary); cursor: not-allowed; opacity: 0.7; }
-        .legend { display: flex; justify-content: center; gap: 20px; margin-bottom: 20px; color: var(--muted); font-size: 0.85rem; }
-        .legend div { display: flex; align-items: center; gap: 8px; }
-        .legend .box-icon { width: 16px; height: 16px; border-radius: 4px; }
+        .seat { width: 30px; height: 30px; background: #333; border-radius: 6px; cursor: pointer; transition: 0.2s; position: relative; }
+        .seat:hover:not(.booked) { background: #444; transform: scale(1.1); }
+        .seat.selected { background: var(--green); transform: scale(1.1); box-shadow: 0 0 15px rgba(70, 211, 105, 0.4); }
+        .seat.booked { background: var(--primary); cursor: not-allowed; opacity: 0.5; }
+        .seat.booked:hover { opacity: 1; }
+        
+        /* Seat Label on Hover */
+        .seat::after {
+            content: attr(data-label);
+            position: absolute;
+            top: -30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.9);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+            white-space: nowrap;
+            display: none;
+            z-index: 100;
+            border: 1px solid var(--border);
+            pointer-events: none;
+        }
+        .seat:hover::after { display: block; }
+        .seat.booked:hover::after { background: var(--primary); border-color: #ff4d4d; }
+        .seat.selected:hover::after { background: var(--green); color: black; border-color: white; }
         
         .receipt-card { background: white !important; color: black !important; padding: 40px; border-radius: 12px; margin: 0 auto; max-width: 500px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        .receipt-card * { color: black !important; border-color: #ccc !important; }
+        .receipt-card * { color: black !important; }
         .receipt-header { text-align: center; border-bottom: 2px dashed #ccc; padding-bottom: 20px; margin-bottom: 20px; }
         .receipt-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 1rem; }
         
@@ -66,165 +104,661 @@
         @keyframes fadein { from { bottom: 0; opacity: 0; } to { bottom: 30px; opacity: 1; } }
         @keyframes fadeout { from { bottom: 30px; opacity: 1; } to { bottom: 0; opacity: 0; } }
         
-        #confirm-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 3000; justify-content: center; align-items: center; }
-        .modal-inner { background: var(--surface); padding: 50px; border-radius: 20px; text-align: center; border: 1px solid var(--border); max-width: 500px; width: 90%; }
-        .id-badge { background: var(--green); color: black; font-size: 2.5rem; font-weight: 800; padding: 10px 30px; border-radius: 10px; display: inline-block; margin: 20px 0; }
-        #output { display: none; }
-        #printable-receipt { display: none; }
+        #confirm-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 3000; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
+        .modal-inner { background: var(--surface); padding: 50px; border-radius: 24px; text-align: center; border: 1px solid var(--border); max-width: 500px; width: 90%; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
+        .id-badge { background: var(--green); color: black; font-size: 2.2rem; font-weight: 900; padding: 12px 40px; border-radius: 12px; display: inline-block; margin: 24px 0; letter-spacing: 4px; font-family: monospace; }
+        
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; padding: 16px; font-size: 0.85rem; color: var(--muted); text-transform: uppercase; border-bottom: 1px solid var(--border); letter-spacing: 1px; }
+        td { padding: 16px; font-size: 0.95rem; border-bottom: 1px solid var(--border); }
     </style>
 </head>
 <body>
-    <div id="output"></div>
-    <div id="printable-receipt"></div>
-
     <nav class="nav no-print">
         <div class="nav-logo">Cine<span>Booking</span></div>
         <div class="nav-links">
             <div class="nav-item active" onclick="switchTab('movies')">Now Showing</div>
             <div class="nav-item" onclick="switchTab('book')">Book Tickets</div>
-            <div class="nav-item" onclick="switchTab('receipt')">View/Cancel</div>
+            <div class="nav-item" onclick="switchTab('scanner')">Scan QR</div>
+            <div class="nav-item" onclick="switchTab('receipt')">Find Ticket</div>
             <div class="nav-item" onclick="switchTab('occupancy')">Occupancy</div>
         </div>
     </nav>
 
     <div class="container no-print">
-        <div id="movies" class="tab-content active"><div class="header"><h1>Now Showing</h1></div><div class="card-grid" id="movieGrid"></div></div>
+        <div id="movies" class="tab-content active">
+            <div class="header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:20px">
+                <h1>Now Showing</h1>
+                <div style="display:flex; gap:10px; align-items:center">
+                    <span style="color:var(--muted); font-size:0.9rem">Region:</span>
+                    <select id="webLoc" onchange="fetchMovies()" style="width:180px; margin-bottom:0">
+                        <option value="india">All India</option>
+                        <option value="hindi">Bollywood</option>
+                        <option value="tamil">Kollywood</option>
+                        <option value="telugu">Tollywood</option>
+                        <option value="malayalam">Mollywood</option>
+                    </select>
+                </div>
+            </div>
+            <div class="card-grid" id="movieGrid"></div>
+        </div>
+
         <div id="book" class="tab-content">
             <div class="header"><h1>Book Tickets</h1></div>
-            <div style="display: flex; gap: 40px;">
-                <div class="box" style="flex: 1;">
+            <div style="display: flex; gap: 40px; flex-wrap: wrap;">
+                <div class="box" style="flex: 1; min-width: 300px;">
                     <div class="form-group"><label>Select Movie</label><select id="bMovie" onchange="fetchSeats()"></select></div>
                     <div class="form-group"><label>Customer Name</label><input type="text" id="bName" placeholder="Enter name"></div>
-                    <button class="btn btn-primary" style="width:100%" onclick="processBooking()">Confirm Booking</button>
+                    <div id="selectedSeatsInfo" style="margin-bottom: 20px; font-weight: 600; color: var(--green); min-height: 24px; font-size: 0.9rem;"></div>
+                    <button id="bookBtn" class="btn btn-primary" style="width:100%" onclick="processBooking()">Confirm Booking</button>
                 </div>
-                <div class="box" style="flex: 2;"><div class="screen">Screen</div><div class="legend"><div><div class="box-icon" style="background: #333"></div> Available</div><div><div class="box-icon" style="background: var(--primary)"></div> Booked</div><div><div class="box-icon" style="background: var(--green)"></div> Selected</div></div><div class="seats-container" id="seatGrid"></div></div>
+                <div class="box" style="flex: 2; min-width: 350px;"><div class="screen">Screen</div><div id="seatGrid" class="seats-container"></div></div>
             </div>
         </div>
-        <div id="receipt" class="tab-content">
-            <div class="header"><h1>Manage Booking</h1></div>
+        
+        <div id="scanner" class="tab-content">
+            <div class="header"><h1>Ticket Scanner</h1></div>
             <div class="box" style="max-width: 500px; margin: 0 auto; text-align: center;">
-                <div class="form-group"><input type="number" id="vBookingId" placeholder="Enter Booking ID"></div>
-                <button class="btn btn-primary" style="width:100%" onclick="fetchReceipt()">Search Booking</button>
+                <p style="color: var(--muted); margin-bottom: 20px;">Point your camera at the ticket QR code to instantly verify entry.</p>
+                <button class="btn btn-primary" id="scanCtrlBtn" style="width:100%" onclick="toggleScanner()">Start Scanning</button>
+                <div id="reader" style="width: 100%; margin-top: 20px; display: none; border-radius: 12px; overflow: hidden; border: 1px solid var(--border);"></div>
             </div>
-            <div id="receiptArea" style="margin-top: 40px; display: none;"></div>
         </div>
+
+        <div id="receipt" class="tab-content">
+            <div class="header"><h1>Find Ticket</h1></div>
+            <div class="box" style="max-width: 500px; margin: 0 auto; text-align: center;">
+                <div class="form-group"><input type="text" id="vBookingId" placeholder="Enter 6-Digit ID"></div>
+                <button class="btn btn-primary" style="width:100%" onclick="fetchReceipt()">Search Ticket</button>
+            </div>
+        </div>
+
         <div id="occupancy" class="tab-content">
             <div class="header" style="display:flex; justify-content:space-between; align-items:center;">
                 <h1>Occupancy Report</h1>
-                <button class="btn btn-outline" onclick="syncFromCloud()">🔄 Sync from Terminal (Cloud)</button>
+                <div style="display:flex; gap:10px">
+                    <button class="btn btn-outline" onclick="syncFromCloud()">🔄 Sync Cloud</button>
+                </div>
             </div>
-            <div class="box"><table><thead><tr><th>ID</th><th>Movie</th><th>Timing</th><th>Booked</th><th>Occupancy</th></tr></thead><tbody id="occBody"></tbody></table></div>
+            <div class="box"><table><thead><tr><th>ID</th><th>Movie</th><th>Timing</th><th>Occupancy</th><th>Rate</th></tr></thead><tbody id="occBody"></tbody></table></div>
         </div>
     </div>
+
+    <div id="receiptArea" class="container" style="display: none;"></div>
 
     <div id="confirm-modal">
         <div class="modal-inner">
             <h1 style="color: var(--green)">Booking Confirmed!</h1>
             <p style="color: var(--muted); margin-top: 10px;">Your Ticket ID is:</p>
-            <div class="id-badge" id="resId">1001</div>
+            <div class="id-badge" id="resId">---</div>
             <p style="margin-bottom: 30px;">Keep this ID to view or cancel your ticket.</p>
-            <button class="btn btn-primary" onclick="closeModal()">Great!</button>
+            <button class="btn btn-primary" onclick="closeModal()">Done</button>
         </div>
     </div>
     <div id="toast">Message</div>
 
     <script type='text/javascript'>
-        let shows = [], currentSeats = [], selectedSeats = [];
-        function showToast(m, s=false) { const t=document.getElementById("toast"); t.innerText=m; t.style.borderBottomColor=s?"var(--green)":"var(--primary)"; t.className="show"; setTimeout(()=>t.className="", 3000); }
+        var shows = [], selectedSeats = [], currentSeats = [], env = {};
+        window.supabaseClient = null;
+        let tmdbKey = "";
+
+        function showToast(m, s=false) { const t=document.getElementById("toast"); if(!t)return; t.innerText=m; t.style.borderBottomColor=s?"var(--green)":"var(--primary)"; t.className="show"; setTimeout(()=>t.className="", 3000); }
         function closeModal() { document.getElementById('confirm-modal').style.display = 'none'; switchTab('movies'); }
-        function switchTab(tabId) { document.querySelectorAll('.tab-content').forEach(el=>el.classList.remove('active')); document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active')); document.getElementById(tabId).classList.add('active'); if(tabId === 'movies') refreshShows(); if(tabId === 'book') populateBookDropdown(); if(tabId === 'occupancy') refreshOccupancy(); }
         
-        function parse(t) {
-            if (t.startsWith("SHOW|")) { const p=t.split("|"); shows.push({id:p[1], name:p[2], timing:p[3], price:p[4]}); }
-            else if (t.startsWith("SEAT|")) { const p=t.split("|"); currentSeats.push({r:parseInt(p[1]), c:parseInt(p[2]), s:parseInt(p[3])}); }
-            else if (t.startsWith("SEAT_DONE|")) { renderSeatGrid(); }
-            else if (t.startsWith("MSG|")) { 
-                const m = t.replace("MSG|", ""); 
-                showToast(m, m.includes("Success")); 
-                if(m.includes("cancelled")) { setTimeout(() => { document.getElementById('receiptArea').style.display = 'none'; refreshOccupancy(); }, 10); }
-            }
-            else if (t.startsWith("SUCCESS_BOOKING|")) { const p=t.split("|"); document.getElementById('resId').innerText = p[1]; document.getElementById('confirm-modal').style.display = 'flex'; selectedSeats = []; }
-            else if (t.startsWith("RECEIPT|")) {
-                const p=t.split("|");
-                const cardHtml = `<div class="receipt-card"><div class="receipt-header"><h2>CINEBOOKING</h2><p>Official Ticket</p></div><div class="receipt-row"><span>ID:</span><b>#${p[1]}</b></div><div class="receipt-row"><span>Name:</span><b>${p[2]}</b></div><div class="receipt-row"><span>Movie:</span><b>${p[3]}</b></div><div class="receipt-row"><span>Time:</span><b>${p[4]}</b></div><div class="receipt-row"><span>Seats:</span><b>${p[7]}</b></div><div class="receipt-row" style="margin-top:20px; font-size:1.2rem"><span>Total:</span><b>₹${p[6]}</b></div><div style="display:flex; gap:10px; margin-top:20px;" class="no-print"><button class="btn btn-outline" style="flex:1" onclick="window.print()">Print/Save PDF</button><button class="btn btn-danger" style="flex:1" onclick="cancelBooking(${p[1]})">Cancel Booking</button></div></div>`;
-                document.getElementById('receiptArea').innerHTML = cardHtml;
-                document.getElementById('receiptArea').style.display = 'block';
-                document.getElementById('printable-receipt').innerHTML = cardHtml;
-            }
-            else if (t.startsWith("REPORT|")) { const p=t.split("|"); document.getElementById('occBody').innerHTML += `<tr><td>#${p[1]}</td><td>${p[2]}</td><td>${p[3]}</td><td>${p[5]}/${p[4]}</td><td style="color:${p[7]>75?'var(--primary)':'var(--green)'}">${parseFloat(p[7]).toFixed(1)}%</td></tr>`; }
+        function switchTab(tabId) { 
+            document.querySelectorAll('.tab-content').forEach(el=>el.classList.remove('active')); 
+            document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active')); 
+            
+            // Stop scanner if leaving scanner tab
+            if (tabId !== 'scanner') stopScanner();
+            
+            const receiptArea = document.getElementById('receiptArea');
+            if (receiptArea) receiptArea.style.display = 'none';
+            const target = document.getElementById(tabId);
+            if (target) target.classList.add('active'); 
+            const navLinks = document.querySelectorAll('.nav-item');
+            if (tabId === 'movies' && navLinks[0]) navLinks[0].classList.add('active');
+            else if (tabId === 'book' && navLinks[1]) navLinks[1].classList.add('active');
+            else if (tabId === 'scanner' && navLinks[2]) navLinks[2].classList.add('active');
+            else if (tabId === 'receipt' && navLinks[3]) navLinks[3].classList.add('active');
+            else if (tabId === 'occupancy' && navLinks[4]) navLinks[4].classList.add('active');
+            
+            if(tabId === 'movies') refreshShows();
+            else if(tabId === 'book') populateBookDropdown();
+            else if(tabId === 'occupancy') refreshOccupancy();
+        }
+        
+        async function loadEnv() {
+            try {
+                const response = await fetch('.env?v=' + Date.now());
+                if (!response.ok) return false;
+                const text = await response.text();
+                text.split(/\r?\n/).forEach(line => {
+                    const parts = line.split('=');
+                    if (parts.length >= 2) {
+                        const k = parts[0].trim();
+                        const v = parts.slice(1).join('=').trim();
+                        if (k && v) env[k] = v;
+                    }
+                });
+                tmdbKey = env['TMDB_API_KEY'];
+                if (env['NEXT_PUBLIC_SUPABASE_URL'] && env['NEXT_PUBLIC_SUPABASE_ANON_KEY']) {
+                    window.supabaseClient = supabase.createClient(env['NEXT_PUBLIC_SUPABASE_URL'], env['NEXT_PUBLIC_SUPABASE_ANON_KEY']);
+                    
+                    // Enable Realtime Listening
+                    window.supabaseClient
+                        .channel('schema-db-changes')
+                        .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, payload => {
+                            console.log('Realtime update received:', payload);
+                            // If we are currently looking at the movie that was updated, refresh the seats
+                            const currentMovieId = document.getElementById('bMovie').value;
+                            if (currentMovieId) fetchSeats();
+                            if (document.getElementById('occupancy').classList.contains('active')) refreshOccupancy();
+                        })
+                        .subscribe();
+                }
+                return true;
+            } catch (e) { console.error(e); return false; }
         }
 
-        var Module = {
+        function hashString(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                hash = ((hash << 5) - hash) + str.charCodeAt(i);
+                hash |= 0;
+            }
+            return Math.abs(hash);
+        }
+
+        async function fetchTMDBPoster(movieName) {
+            if (!tmdbKey) return null;
+            try {
+                const r = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${tmdbKey}&query=${encodeURIComponent(movieName)}`);
+                const d = await r.json();
+                if (d.results && d.results[0] && d.results[0].poster_path) {
+                    return `https://image.tmdb.org/t/p/w500${d.results[0].poster_path}`;
+                }
+            } catch(e) {}
+            return null;
+        }
+
+        async function fetchMovies() {
+            const loc = document.getElementById('webLoc').value;
+            showToast("Updating Live Movies...");
+            const liveCinema = {
+                "india": [
+                    { name: "Kalki 2898 AD", time: "10:30 AM", price: 250 },
+                    { name: "Pushpa 2: The Rule", time: "01:45 PM", price: 300 },
+                    { name: "Stree 2", time: "04:30 PM", price: 200 },
+                    { name: "Singham Again", time: "07:15 PM", price: 220 },
+                    { name: "Animal", time: "10:00 PM", price: 250 }
+                ],
+                "hindi": [
+                    { name: "Fighter", time: "11:00 AM", price: 200 },
+                    { name: "Shaitaan", time: "02:15 PM", price: 180 },
+                    { name: "Crew", time: "05:00 PM", price: 220 },
+                    { name: "Maidaan", time: "08:00 PM", price: 200 },
+                    { name: "Bade Miyan Chote Miyan", time: "11:00 PM", price: 250 }
+                ],
+                "tamil": [
+                    { name: "Leo", time: "10:00 AM", price: 250 },
+                    { name: "Vettaiyan", time: "01:15 PM", price: 220 },
+                    { name: "Raayan", time: "04:30 PM", price: 200 },
+                    { name: "Indian 2", time: "07:45 PM", price: 180 },
+                    { name: "Thangalaan", time: "11:00 PM", price: 150 }
+                ],
+                "telugu": [
+                    { name: "Devara", time: "10:00 AM", price: 300 },
+                    { name: "Salaar", time: "01:30 PM", price: 280 },
+                    { name: "Tillu Square", time: "04:45 PM", price: 200 },
+                    { name: "HanuMan", time: "08:00 PM", price: 180 },
+                    { name: "Guntur Kaaram", time: "11:15 PM", price: 250 }
+                ],
+                "malayalam": [
+                    { name: "Manjummel Boys", time: "10:00 AM", price: 180 },
+                    { name: "Premalu", time: "01:15 PM", price: 150 },
+                    { name: "Aavesham", time: "04:30 PM", price: 220 },
+                    { name: "Bramayugam", time: "07:45 PM", price: 180 },
+                    { name: "Aadujeevitham", time: "11:00 PM", price: 200 }
+                ]
+            };
+            const data = liveCinema[loc] || liveCinema["india"];
+            
+            const updatedShows = [];
+            for (let m of data) {
+                const poster = await fetchTMDBPoster(m.name);
+                updatedShows.push({
+                    id: hashString(m.name + m.time),
+                    name: m.name,
+                    timing: m.time,
+                    price: parseFloat(m.price).toFixed(2),
+                    img: poster || `https://via.placeholder.com/300x450?text=${encodeURIComponent(m.name)}`,
+                    region: loc
+                });
+            }
+
+            if (window.Module && Module.ccall) {
+                try {
+                    updatedShows.forEach(s => {
+                        Module.ccall('addOrUpdateShow', null, ['number','string','string','number','string','string'], [parseInt(s.id), s.name, s.timing, parseFloat(s.price), s.img, s.region]);
+                    });
+                    Module.ccall('saveData', null, [], []);
+                } catch(e){ console.error("WASM Update Error:", e); }
+            }
+
+            if (window.supabaseClient) {
+                try {
+                    const syncData = updatedShows.map(s => ({
+                        id: parseInt(s.id),
+                        name: s.name,
+                        timing: s.timing,
+                        price: parseFloat(s.price)
+                    }));
+                    window.supabaseClient.from('shows').upsert(syncData).then(({error}) => {
+                        if (error) console.error("Supabase Shows Sync Error:", error);
+                    });
+                } catch(e) { console.error("Supabase Sync Exception:", e); }
+            }
+
+            refreshShows(); 
+            showToast("Movies Ready!", true);
+        }
+
+        function parse(t) {
+            if (t.startsWith("SHOW|")) { 
+                const p=t.split("|"); 
+                shows.push({id:p[1], name:p[2], timing:p[3], price:p[4], img:p[5], region:p[6]}); 
+            }
+            else if (t.startsWith("SEAT|")) { const p=t.split("|"); currentSeats.push({r:parseInt(p[1]), c:parseInt(p[2]), s:parseInt(p[3])}); }
+            else if (t.startsWith("SEAT_DONE|")) { renderSeatGrid(); }
+            else if (t.startsWith("REPORT|")) {
+                const p=t.split("|");
+                const b=document.getElementById('occBody');
+                if(!b) return;
+                b.innerHTML += `<tr>
+                    <td>#${p[1]}</td>
+                    <td>${p[2]}</td>
+                    <td>${p[3]}</td>
+                    <td><b>${p[5]} / ${p[4]}</b> Seats</td>
+                    <td style="color:${parseFloat(p[7]) > 50 ? 'var(--primary)' : 'var(--green)'}">${p[7]}%</td>
+                </tr>`;
+            }
+            else if (t.startsWith("QR_DATA|")) {
+                const qrContent = t.split("|")[1];
+                const qrDiv = document.getElementById("ticketQr");
+                if (qrDiv && qrContent !== "INVALID") {
+                    qrDiv.innerHTML = "";
+                    new QRCode(qrDiv, {
+                        text: qrContent,
+                        width: 100,
+                        height: 100,
+                        colorDark : "#000000",
+                        colorLight : "#ffffff",
+                        correctLevel : QRCode.CorrectLevel.H
+                    });
+                }
+            }
+            else if (t.startsWith("MSG|")) { showToast(t.replace("MSG|", ""), t.includes("Success")); }
+            else if (t.startsWith("SUCCESS_BOOKING|")) {
+                // Format: SUCCESS_BOOKING|ID|PRICE|NAME
+                // The seats are already booked in WASM, but let's ensure fetchSeats is triggered
+                // to keep the cloud-synced view consistent.
+                fetchSeats();
+            }
+        }
+
+        window.Module = {
             print: (t) => parse(t),
             preRun: [function() { try { FS.mkdir('/data'); FS.mount(IDBFS, {}, '/data'); } catch(e){} }],
-            onRuntimeInitialized: function() { 
+            onRuntimeInitialized: async function() { 
+                await loadEnv(); 
                 FS.syncfs(true, function (err) { 
-                    if (err) { 
-                        console.error("IDBFS mount error:", err); 
-                        showToast("Error: Local database sync failed!"); 
-                    } else {
-                        Module.ccall('loadData', null, [], []); 
-                        refreshShows(); 
+                    if (!err) {
+                        if(window.Module.ccall) window.Module.ccall('loadData', null, [], []); 
+                        fetchMovies();
                         showToast("System Ready", true);
                     }
                 }); 
             }
         };
 
-        function refreshShows() { shows=[]; Module.ccall('getShows', null, [], []); setTimeout(()=>{ const g=document.getElementById('movieGrid'); if(!g) return; g.innerHTML=""; shows.forEach(s=>{ g.innerHTML+=`<div class="movie-card"><h3>${s.name}</h3><p>${s.timing}</p><div style="display:flex; justify-content:space-between; align-items:center"><b>₹${s.price}</b><button class="btn btn-primary" onclick="bookFromMovieTab(${s.id})">Book</button></div></div>`; }); }, 100); }
+        function renderShowsOnGrid() {
+            const loc = document.getElementById('webLoc').value;
+            const g=document.getElementById('movieGrid'); if(!g) return; g.innerHTML=""; 
+            const filtered = shows.filter(s => s.region === loc);
+            filtered.forEach(s=>{ 
+                g.innerHTML+=`<div class="movie-card">
+                    <div class="movie-poster-wrap">
+                        <img src="${s.img}" class="movie-poster" alt="${s.name}" onerror="this.src='https://via.placeholder.com/300x450?text=${encodeURIComponent(s.name)}'">
+                    </div>
+                    <div class="movie-info">
+                        <h3>${s.name}</h3>
+                        <p>🕒 ${s.timing}</p>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:auto">
+                            <div class="price-tag"><span>₹</span>${s.price}</div>
+                            <button class="btn btn-primary" style="padding: 10px 20px" onclick="bookFromMovieTab(${s.id})">Book</button>
+                        </div>
+                    </div>
+                </div>`; 
+            });
+            populateBookDropdown();
+        }
+
+        function refreshShows() { 
+            shows=[]; 
+            if(Module.ccall) Module.ccall('getShows', null, [], []); 
+            // Small timeout to ensure parse() catches all outputs from WASM before rendering
+            setTimeout(() => renderShowsOnGrid(), 50); 
+        }
+        
         function bookFromMovieTab(id) { switchTab('book'); setTimeout(()=>{ document.getElementById('bMovie').value=id; fetchSeats(); }, 50); }
         function populateBookDropdown() { const sel=document.getElementById('bMovie'); if(!sel) return; sel.innerHTML="<option value=''>-- Movie --</option>"; shows.forEach(s=>sel.innerHTML+=`<option value="${s.id}">${s.name}</option>`); }
-        function fetchSeats() { const id=document.getElementById('bMovie').value; if(!id) return; currentSeats=[]; selectedSeats=[]; Module.ccall('getSeatLayout', null, ['number'], [parseInt(id)]); }
+        async function fetchSeats() { 
+            const id=document.getElementById('bMovie').value; 
+            if(!id) return; 
+            currentSeats=[]; 
+            selectedSeats=[]; 
+            updateSelectedSeatsInfo(); 
+            
+            // 1. Fetch Local Layout from WASM
+            if(Module.ccall) Module.ccall('getSeatLayout', null, ['number'], [parseInt(id)]); 
+            
+            // 2. Fetch Live Bookings from Cloud to Sync Seats
+            if(window.supabaseClient) {
+                try {
+                    const { data, error } = await window.supabaseClient
+                        .from('bookings')
+                        .select('seats')
+                        .eq('show_id', parseInt(id));
+                    
+                    if(!error && data) {
+                        data.forEach(booking => {
+                            const seats = booking.seats.split('-');
+                            seats.forEach(s => {
+                                const [r, c] = s.split(',').map(Number);
+                                // Mark as booked in the local view
+                                const seat = currentSeats.find(x => x.r === r && x.c === c);
+                                if(seat) seat.s = 1;
+                                else currentSeats.push({r, c, s: 1});
+                            });
+                        });
+                        renderSeatGrid();
+                    }
+                } catch(e) { console.error("Cloud Sync Error:", e); }
+            }
+        }
+        
         function renderSeatGrid() { 
-            const g=document.getElementById('seatGrid'); if(!g) return; let h=""; 
+            const g=document.getElementById('seatGrid'); if(!g) return; h=""; 
             for(let r=0; r<5; r++) { 
                 h+=`<div class="seat-row">`; 
                 for(let c=0; c<10; c++) { 
                     const s=currentSeats.find(x=>x.r===r && x.c===c); 
-                    const label = `R${r+1} C${c+1}`;
-                    if(s && s.s===1) h+=`<div class="seat booked" data-label="${label}">X</div>`; 
-                    else h+=`<div class="seat" data-label="${label}" onclick="toggleSeat(${r}, ${c}, this)"></div>`; 
+                    const seatLabel = `R${r+1} C${c+1}`;
+                    if(s && s.s===1) h+=`<div class="seat booked" data-label="${seatLabel} (Booked)"></div>`; 
+                    else {
+                        const isSelected = selectedSeats.some(x => x.r === r && x.c === c);
+                        h+=`<div class="seat ${isSelected ? 'selected' : ''}" onclick="toggleSeat(${r}, ${c}, this)" data-label="${seatLabel}"></div>`; 
+                    }
                 } 
                 h+=`</div>`; 
             } 
             g.innerHTML=h; 
         }
-        function toggleSeat(r, c, el) { const i=selectedSeats.findIndex(s=>s.r===r && s.c===c); if(i>-1) { selectedSeats.splice(i, 1); el.classList.remove('selected'); } else { if(selectedSeats.length>=20) return; selectedSeats.push({r, c}); el.classList.add('selected'); } }
-        function processBooking() { const id=document.getElementById('bMovie').value, n=document.getElementById('bName').value.trim(); if(!id || !n || selectedSeats.length===0) return showToast("Missing info!"); Module.ccall('bookTickets', null, ['number', 'string', 'number', 'string'], [parseInt(id), n, selectedSeats.length, selectedSeats.map(s=>`${s.r},${s.c}`).join('-')]); }
-        function fetchReceipt() { const id=document.getElementById('vBookingId').value; if(id) Module.ccall('viewBooking', null, ['number'], [parseInt(id)]); }
-        function cancelBooking(id) { if(confirm("Are you sure you want to cancel this booking?")) { setTimeout(() => { Module.ccall('cancelBooking', null, ['number'], [id]); }, 10); } }
-        function refreshOccupancy() { const b=document.getElementById('occBody'); if(b) b.innerHTML=""; Module.ccall('getOccupancyReport', null, [], []); }
+
+        function updateSelectedSeatsInfo() {
+            const info = document.getElementById('selectedSeatsInfo');
+            if (!info) return;
+            if (selectedSeats.length === 0) {
+                info.innerText = "";
+            } else {
+                const seats = selectedSeats.map(s => `R${s.r + 1} C${s.c + 1}`).join(", ");
+                info.innerText = `Selected: ${seats}`;
+            }
+        }
+
+        function toggleSeat(r, c, el) { 
+            const i=selectedSeats.findIndex(s=>s.r===r && s.c===c); 
+            if(i>-1) { 
+                selectedSeats.splice(i, 1); 
+                el.classList.remove('selected'); 
+            } else { 
+                if(selectedSeats.length>=20) return; 
+                selectedSeats.push({r, c}); 
+                el.classList.add('selected'); 
+            } 
+            updateSelectedSeatsInfo();
+        }
+        
+        async function processBooking() { 
+            const id=document.getElementById('bMovie').value, n=document.getElementById('bName').value.trim(); 
+            if(!id || !n || selectedSeats.length===0) return showToast("Missing info!"); 
+            const btn = document.getElementById('bookBtn');
+            btn.disabled = true; btn.innerText = "Processing...";
+            const movie = shows.find(s => s.id == id);
+            const shortId = Math.random().toString(36).substring(2, 8).toUpperCase();
+            const seatList = selectedSeats.map(s=>`${s.r},${s.c}`).join('-');
+            try {
+                if(window.supabaseClient) {
+                    const { data: syncData, error: syncErr } = await window.supabaseClient.from('bookings').insert({ 
+                        id_short: shortId, 
+                        show_id: parseInt(id), 
+                        customer_name: n, 
+                        num_seats: selectedSeats.length, 
+                        seats: seatList, 
+                        total_amount: parseFloat(movie.price) * selectedSeats.length 
+                    }).select();
+                    if(syncErr) throw syncErr;
+                }
+                if(Module.ccall) Module.ccall('bookTickets', null, ['number', 'string', 'number', 'string', 'string'], [parseInt(id), n, selectedSeats.length, seatList, shortId]);
+                document.getElementById('resId').innerHTML = shortId;
+                document.getElementById('confirm-modal').style.display = 'flex';
+                selectedSeats = [];
+                updateSelectedSeatsInfo();
+            } catch(e) { console.error(e); showToast("Cloud Error"); } finally { btn.disabled = false; btn.innerText = "Confirm Booking"; }
+        }
+
+        async function doCancelTicket(shortId) {
+            if(!confirm("Are you sure you want to cancel this ticket?")) return;
+            showToast("Cancelling...");
+            try {
+                const { data, error } = await window.supabaseClient.from('bookings').delete().eq('id_short', shortId);
+                if(error) throw error;
+                if(window.Module && typeof window.Module.ccall === 'function') {
+                    window.Module.ccall('cancelBooking', null, ['string'], [shortId]);
+                }
+                showToast("Ticket Cancelled!", true);
+                document.getElementById('receiptArea').style.display = 'none';
+                if(typeof refreshOccupancy === 'function') refreshOccupancy();
+            } catch(e) { console.error(e); showToast("Cancellation Failed"); }
+        }
+
+        var html5QrCode = null;
+        async function toggleScanner() {
+            const readerDiv = document.getElementById('reader');
+            const ctrlBtn = document.getElementById('scanCtrlBtn');
+            if (readerDiv.style.display === 'none') {
+                readerDiv.style.display = 'block';
+                ctrlBtn.innerText = "Stop Scanning";
+                ctrlBtn.classList.replace('btn-primary', 'btn-danger');
+                if (!html5QrCode) {
+                    html5QrCode = new Html5Qrcode("reader");
+                }
+                const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+                try {
+                    await html5QrCode.start({ facingMode: "environment" }, config, (decodedText) => {
+                        let ticketId = decodedText;
+                        if (decodedText.includes("CINEBOOKING-")) {
+                            ticketId = decodedText.split("-")[1];
+                        } else if (decodedText.includes("/v/")) {
+                            ticketId = decodedText.split("/v/")[1];
+                        }
+                        stopScanner();
+                        switchTab('receipt');
+                        document.getElementById('vBookingId').value = ticketId;
+                        fetchReceipt();
+                    });
+                } catch (err) {
+                    showToast("Camera Access Denied");
+                    stopScanner();
+                }
+            } else {
+                stopScanner();
+            }
+        }
+
+        function stopScanner() {
+            const readerDiv = document.getElementById('reader');
+            const ctrlBtn = document.getElementById('scanCtrlBtn');
+            if(readerDiv) readerDiv.style.display = 'none';
+            if(ctrlBtn) {
+                ctrlBtn.innerText = "Start Scanning";
+                ctrlBtn.classList.replace('btn-danger', 'btn-primary');
+            }
+            if (html5QrCode && html5QrCode.isScanning) {
+                html5QrCode.stop();
+            }
+        }
+
+        async function fetchReceipt() { 
+            const inputId = document.getElementById('vBookingId').value.trim().toUpperCase(); 
+            if(!inputId) return showToast("Enter Ticket ID");
+
+            const searchBtn = document.querySelector("#receipt .btn-primary");
+            const originalText = searchBtn.innerText;
+            searchBtn.disabled = true;
+            searchBtn.innerText = "Searching...";
+
+            showToast("Searching Cloud...");
+            if(!window.supabaseClient) {
+                searchBtn.disabled = false;
+                searchBtn.innerText = originalText;
+                return showToast("Database Not Connected");
+            }
+
+            try {
+                // Fetch booking first
+                const { data: booking, error: bErr } = await window.supabaseClient
+                    .from('bookings')
+                    .select('*')
+                    .eq('id_short', inputId)
+                    .maybeSingle();
+
+                if(bErr) throw bErr;
+                if(!booking) {
+                    showToast("Ticket Not Found");
+                    searchBtn.disabled = false;
+                    searchBtn.innerText = originalText;
+                    return;
+                }
+
+                // Fetch show details
+                const { data: show, error: sErr } = await window.supabaseClient
+                    .from('shows')
+                    .select('*')
+                    .eq('id', booking.show_id)
+                    .maybeSingle();
+
+                const cardHtml = `<div class="receipt-card" style="position: relative; border: 1px solid #eee;">
+                    <div style="position: absolute; top: 20px; right: 20px; color: #46D369; font-weight: 800; border: 2px solid #46D369; padding: 4px 10px; border-radius: 4px; transform: rotate(15deg); font-size: 0.8rem; text-transform: uppercase;">Verified</div>
+                    <div class="receipt-header">
+                        <h2 style="letter-spacing: 2px; color: #000;">CINEBOOKING</h2>
+                        <p style="font-size: 0.8rem; color: #666;">Official E-Ticket</p>
+                    </div>
+                    <div style="display: flex; gap: 30px; align-items: flex-start; margin-bottom: 20px;">
+                        <div style="flex: 1;">
+                            <div class="receipt-row"><span>Booking ID:</span><b>#${booking.id_short}</b></div>
+                            <div class="receipt-row"><span>Guest:</span><b>${booking.customer_name}</b></div>
+                            <div class="receipt-row"><span>Movie:</span><b>${show ? show.name : 'Unknown'}</b></div>
+                            <div class="receipt-row"><span>Time:</span><b>${show ? show.timing : '---'}</b></div>
+                            <div class="receipt-row"><span>Seats:</span><b>${booking.seats}</b></div>
+                            <div class="receipt-row" style="margin-top:15px; font-size:1.1rem; border-top: 1px solid #eee; padding-top: 10px;"><span>Amount Paid:</span><b>₹${booking.total_amount.toFixed(2)}</b></div>
+                        </div>
+                        <div id="ticketQr" style="padding: 5px; background: white; border: 1px solid #eee; border-radius: 4px;"></div>
+                    </div>
+                    <div style="text-align: center; border-top: 2px dashed #eee; padding-top: 20px;">
+                        <svg id="barcode"></svg>
+                    </div>
+                    <div style="display:flex; gap:10px; margin-top:20px;" class="no-print">
+                        <button class="btn btn-primary" style="flex:1" onclick="window.print()">Download PDF</button>
+                        <button class="btn btn-danger" style="flex:1" onclick="doCancelTicket('${booking.id_short}')">Cancel Ticket</button>
+                    </div>
+                </div>`;
+
+                document.getElementById('receiptArea').innerHTML = cardHtml;
+                document.getElementById('receiptArea').style.display = 'block';
+
+                // 1. Generate High-Quality QR Code
+                new QRCode(document.getElementById("ticketQr"), {
+                    text: `https://cinebooking.app/v/${booking.id_short}`,
+                    width: 110,
+                    height: 110,
+                    colorDark : "#000000",
+                    colorLight : "#ffffff",
+                    correctLevel : QRCode.CorrectLevel.H
+                });
+
+                // 2. Generate Real 1D Barcode (CODE128)
+                JsBarcode("#barcode", booking.id_short, {
+                    format: "CODE128",
+                    width: 2,
+                    height: 50,
+                    displayValue: true,
+                    fontSize: 14,
+                    lineColor: "#000"
+                });
+
+                showToast("Ticket Found!", true);
+            } catch(err) { 
+                console.error(err);
+                showToast("Search Failed"); 
+            } finally {
+                searchBtn.disabled = false;
+                searchBtn.innerText = originalText;
+            }
+        }
+
+
+        async function refreshOccupancy() { 
+            const b=document.getElementById('occBody'); if(!b) return; b.innerHTML=""; 
+            
+            // 1. Sync cloud bookings to WASM for accurate reporting
+            if(window.supabaseClient && window.Module && Module.ccall) {
+                try {
+                    const { data, error } = await window.supabaseClient.from('bookings').select('show_id, seats');
+                    if(!error && data) {
+                        // Clear all seats in WASM first
+                        shows.forEach(s => {
+                            for(let r=0; r<5; r++) {
+                                for(let c=0; c<10; c++) {
+                                    Module.ccall('markSeat', null, ['number','number','number','number'], [parseInt(s.id), r, c, 0]);
+                                }
+                            }
+                        });
+                        // Mark seats from cloud bookings
+                        data.forEach(booking => {
+                            const seats = booking.seats.split('-');
+                            seats.forEach(s => {
+                                const [r, c] = s.split(',').map(Number);
+                                Module.ccall('markSeat', null, ['number','number','number','number'], [parseInt(booking.show_id), r, c, 1]);
+                            });
+                        });
+                    }
+                } catch(e) { console.error("Occupancy Sync Error:", e); }
+            }
+
+            if(Module.ccall) Module.ccall('getOccupancyReport', null, [], []); 
+        }
 
         async function syncFromCloud() {
-            if(!confirm("This will overwrite your browser's data with the latest files from your Terminal (GitHub). Proceed?")) return;
-            showToast("Syncing from Cloud...");
+            if(!confirm("Sync from Terminal?")) return;
             try {
-                // Fetch latest files from origin with cache-busting
-                const res1 = await fetch('shows.dat?nocache=' + new Date().getTime());
-                const res2 = await fetch('bookings.dat?nocache=' + new Date().getTime());
-                if(!res1.ok || !res2.ok) throw new Error("Could not fetch data from server.");
-                
-                const data1 = new Uint8Array(await res1.arrayBuffer());
-                const data2 = new Uint8Array(await res2.arrayBuffer());
-
-                // Write to Emscripten data folder
-                FS.writeFile('/data/shows.dat', data1);
-                FS.writeFile('/data/bookings.dat', data2);
-                
-                // Persist back to IDBFS
-                FS.syncfs(false, function (err) {
-                    if (err) {
-                        showToast("Browser sync failed!");
-                        console.error(err);
-                    } else {
-                        showToast("Sync Successful! Reloading...", true);
-                        setTimeout(() => location.reload(), 1500);
-                    }
-                });
-            } catch(e) {
-                console.error(e);
-                showToast("Sync Failed: " + e.message);
-            }
+                const r1 = await fetch('shows.dat?c=' + Date.now()), r2 = await fetch('bookings.dat?c=' + Date.now());
+                if(!r1.ok || !r2.ok) throw new Error();
+                FS.writeFile('/data/shows_v3.dat', new Uint8Array(await r1.arrayBuffer()));
+                FS.writeFile('/data/bookings_v3.dat', new Uint8Array(await r2.arrayBuffer()));
+                FS.syncfs(false, () => location.reload());
+            } catch(e) { showToast("Sync Fail"); }
         }
     </script>
     <script async src="index.js"></script>
