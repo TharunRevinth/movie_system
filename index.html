@@ -249,19 +249,18 @@
         }
         
         async function loadEnv() {
-            // Placeholders for GitHub Actions injection
+            // Placeholders for build-time injection (Vercel/Netlify/GitHub Actions)
             const githubEnv = {
                 'TMDB_API_KEY': 'TMDB_API_KEY_PLACEHOLDER',
                 'NEXT_PUBLIC_SUPABASE_URL': 'SUPABASE_URL_PLACEHOLDER',
                 'NEXT_PUBLIC_SUPABASE_ANON_KEY': 'SUPABASE_ANON_KEY_PLACEHOLDER'
             };
 
-            // If injected by GitHub Actions, use those
-            // We check if the placeholder string HAS BEEN REPLACED
-            if (githubEnv.TMDB_API_KEY && githubEnv.TMDB_API_KEY !== 'TMDB_API_KEY_PLACEHOLDER') {
-                Object.assign(env, githubEnv);
-            } else {
-                // Otherwise try local .env for development
+            // 1. Check if we are running locally (localhost or 127.0.0.1)
+            const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+            if (isLocal) {
+                console.log("Running locally, attempting to load .env file...");
                 try {
                     const response = await fetch('.env?v=' + Date.now());
                     if (response.ok) {
@@ -275,7 +274,15 @@
                             }
                         });
                     }
-                } catch (e) { console.warn("Local .env not found"); }
+                } catch (e) { console.warn("Local .env not found, falling back to placeholders"); }
+            }
+
+            // 2. If keys are still placeholders, try using the build-time injected githubEnv
+            if (!env['TMDB_API_KEY'] || env['TMDB_API_KEY'] === 'TMDB_API_KEY_PLACEHOLDER') {
+                if (githubEnv.TMDB_API_KEY !== 'TMDB_API_KEY_PLACEHOLDER') {
+                    console.log("Using injected environment variables.");
+                    Object.assign(env, githubEnv);
+                }
             }
 
             tmdbKey = env['TMDB_API_KEY'];
