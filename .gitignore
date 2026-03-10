@@ -10,3 +10,8 @@ movie_system
 # OS files
 .DS_Store
 *.pdf
+node_modules/
+.next/
+.env
+bun.lock
+

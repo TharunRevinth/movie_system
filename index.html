@@ -205,12 +205,12 @@
         function showToast(m, s=false) { const t=document.getElementById("toast"); if(!t)return; t.innerText=m; t.style.borderBottomColor=s?"var(--green)":"var(--primary)"; t.className="show"; setTimeout(()=>t.className="", 3000); }
         function closeModal() { document.getElementById('confirm-modal').style.display = 'none'; switchTab('movies'); }
         
-        function switchTab(tabId) { 
+        async function switchTab(tabId) { 
             document.querySelectorAll('.tab-content').forEach(el=>el.classList.remove('active')); 
             document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active')); 
             
             // Stop scanner if leaving scanner tab
-            if (tabId !== 'scanner') stopScanner();
+            if (tabId !== 'scanner') await stopScanner();
             
             const receiptArea = document.getElementById('receiptArea');
             if (receiptArea) receiptArea.style.display = 'none';
@@ -586,28 +586,34 @@
                 }
                 const config = { fps: 10, qrbox: { width: 250, height: 250 } };
                 try {
-                    await html5QrCode.start({ facingMode: "environment" }, config, (decodedText) => {
+                    await html5QrCode.start({ facingMode: "environment" }, config, async (decodedText) => {
+                        console.log("QR Scanned:", decodedText);
                         let ticketId = decodedText;
                         if (decodedText.includes("CINEBOOKING-")) {
                             ticketId = decodedText.split("-")[1];
                         } else if (decodedText.includes("/v/")) {
                             ticketId = decodedText.split("/v/")[1];
                         }
-                        stopScanner();
+                        
+                        await stopScanner();
                         switchTab('receipt');
-                        document.getElementById('vBookingId').value = ticketId;
-                        fetchReceipt();
+                        const inputEl = document.getElementById('vBookingId');
+                        if (inputEl) {
+                            inputEl.value = ticketId;
+                            fetchReceipt();
+                        }
                     });
                 } catch (err) {
+                    console.error("Scanner error:", err);
                     showToast("Camera Access Denied");
-                    stopScanner();
+                    await stopScanner();
                 }
             } else {
-                stopScanner();
+                await stopScanner();
             }
         }
 
-        function stopScanner() {
+        async function stopScanner() {
             const readerDiv = document.getElementById('reader');
             const ctrlBtn = document.getElementById('scanCtrlBtn');
             if(readerDiv) readerDiv.style.display = 'none';
@@ -615,8 +621,15 @@
                 ctrlBtn.innerText = "Start Scanning";
                 ctrlBtn.classList.replace('btn-danger', 'btn-primary');
             }
-            if (html5QrCode && html5QrCode.isScanning) {
-                html5QrCode.stop();
+            if (html5QrCode) {
+                try {
+                    const state = html5QrCode.getState();
+                    if (state === 2 || state === 3) { // 2 = SCANNING, 3 = PAUSED
+                        await html5QrCode.stop();
+                    }
+                } catch (e) {
+                    console.warn("Stop scanner error:", e);
+                }
             }
         }
 
