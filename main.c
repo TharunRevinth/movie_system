@@ -21,7 +21,7 @@ typedef struct {
     char movie_name[64];
     char timing[32];
     float price;
-    char img_url[128];
+    char img_url[256];
     char region[32]; // Added region field
     int seats[ROWS][COLS];
 } Show;
@@ -70,7 +70,7 @@ void EMSCRIPTEN_KEEPALIVE addOrUpdateShow(int id, char* name, char* timing, floa
     strncpy(shows[idx].movie_name, name, 63);
     strcpy(shows[idx].timing, timing);
     shows[idx].price = price;
-    strncpy(shows[idx].img_url, img, 127);
+    strncpy(shows[idx].img_url, img, 255);
     strncpy(shows[idx].region, region, 31);
 }
 
