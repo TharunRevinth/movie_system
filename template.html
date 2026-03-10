@@ -249,18 +249,16 @@
         }
         
         async function loadEnv() {
-            // Placeholders for build-time injection (Vercel/Netlify/GitHub Actions)
+            // Values injected by build-time
             const githubEnv = {
                 'TMDB_API_KEY': 'TMDB_API_KEY_PLACEHOLDER',
                 'NEXT_PUBLIC_SUPABASE_URL': 'SUPABASE_URL_PLACEHOLDER',
                 'NEXT_PUBLIC_SUPABASE_ANON_KEY': 'SUPABASE_ANON_KEY_PLACEHOLDER'
             };
 
-            // 1. Check if we are running locally (localhost or 127.0.0.1)
             const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
             if (isLocal) {
-                console.log("Running locally, attempting to load .env file...");
                 try {
                     const response = await fetch('.env?v=' + Date.now());
                     if (response.ok) {
@@ -274,19 +272,15 @@
                             }
                         });
                     }
-                } catch (e) { console.warn("Local .env not found, falling back to placeholders"); }
+                } catch (e) { }
             }
 
-            // 2. If keys are still placeholders, try using the build-time injected githubEnv
+            // Fallback to injected values
             if (!env['TMDB_API_KEY'] || env['TMDB_API_KEY'] === 'TMDB_API_KEY_PLACEHOLDER') {
-                if (githubEnv.TMDB_API_KEY !== 'TMDB_API_KEY_PLACEHOLDER') {
-                    console.log("Using injected environment variables.");
-                    Object.assign(env, githubEnv);
-                }
+                Object.assign(env, githubEnv);
             }
 
             tmdbKey = env['TMDB_API_KEY'];
-            console.log("TMDB Key Loaded:", tmdbKey ? "YES (length " + tmdbKey.length + ")" : "NO");
             if (env['NEXT_PUBLIC_SUPABASE_URL'] && env['NEXT_PUBLIC_SUPABASE_ANON_KEY']) {
                 window.supabaseClient = supabase.createClient(env['NEXT_PUBLIC_SUPABASE_URL'], env['NEXT_PUBLIC_SUPABASE_ANON_KEY']);
                 
@@ -314,11 +308,6 @@
         }
 
         async function fetchTMDBPoster(movieName) {
-            // Check if it's the placeholder (not yet replaced by GitHub Action)
-            if (!tmdbKey || tmdbKey === 'TMDB_API_KEY_PLACEHOLDER') {
-                console.warn("TMDB Key not available or placeholder");
-                return `https://placehold.co/500x750/1a1a1a/ffffff?text=${encodeURIComponent(movieName)}`;
-            }
             try {
                 const r = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${tmdbKey}&query=${encodeURIComponent(movieName)}`);
                 if (!r.ok) throw new Error("TMDB API Error: " + r.status);
@@ -326,9 +315,7 @@
                 if (d.results && d.results[0] && d.results[0].poster_path) {
                     return `https://image.tmdb.org/t/p/w500${d.results[0].poster_path}`;
                 }
-            } catch(e) {
-                console.error("TMDB Fetch Error for " + movieName + ":", e);
-            }
+            } catch(e) { }
             return `https://placehold.co/500x750/1a1a1a/ffffff?text=${encodeURIComponent(movieName)}`;
         }
 
