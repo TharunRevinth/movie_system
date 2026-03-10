@@ -60,8 +60,8 @@
         .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 32px; padding-bottom: 40px; }
         .movie-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; height: 100%; transition: transform 0.3s, border-color 0.3s, box-shadow 0.3s; position: relative; }
         .movie-card:hover { transform: translateY(-10px); border-color: var(--primary); box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.6); }
-        .movie-poster-wrap { width: 100%; aspect-ratio: 2/3; background: #1a1a1a; overflow: hidden; position: relative; }
-        .movie-poster { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.5s; }
+        .movie-poster-wrap { width: 100%; aspect-ratio: 2/3; background: #1a1a1a; overflow: hidden; position: relative; display: flex; align-items: center; justify-content: center; text-align: center; color: var(--muted); padding: 20px; font-weight: 700; font-size: 0.9rem; }
+        .movie-poster { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.5s; position: absolute; top: 0; left: 0; z-index: 1; }
         .movie-card:hover .movie-poster { transform: scale(1.05); }
         .movie-info { padding: 20px; display: flex; flex-direction: column; flex-grow: 1; gap: 12px; }
         .movie-info h3 { font-size: 1.2rem; font-weight: 800; color: white; line-height: 1.2; margin: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; height: 2.8rem; }
@@ -308,19 +308,20 @@
         async function fetchTMDBPoster(movieName) {
             // Check if it's the placeholder (not yet replaced by GitHub Action)
             if (!tmdbKey || tmdbKey === 'TMDB_API_KEY_PLACEHOLDER') {
-                console.warn("TMDB Key not available, using placeholder");
-                return `https://via.placeholder.com/500x750/1a1a1a/ffffff?text=${encodeURIComponent(movieName)}`;
+                console.warn("TMDB Key not available or placeholder");
+                return `https://placehold.co/500x750/1a1a1a/ffffff?text=${encodeURIComponent(movieName)}`;
             }
             try {
                 const r = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${tmdbKey}&query=${encodeURIComponent(movieName)}`);
+                if (!r.ok) throw new Error("TMDB API Error: " + r.status);
                 const d = await r.json();
                 if (d.results && d.results[0] && d.results[0].poster_path) {
                     return `https://image.tmdb.org/t/p/w500${d.results[0].poster_path}`;
                 }
             } catch(e) {
-                console.error("TMDB Fetch Error:", e);
+                console.error("TMDB Fetch Error for " + movieName + ":", e);
             }
-            return `https://via.placeholder.com/500x750/1a1a1a/ffffff?text=${encodeURIComponent(movieName)}`;
+            return `https://placehold.co/500x750/1a1a1a/ffffff?text=${encodeURIComponent(movieName)}`;
         }
 
         async function fetchMovies() {
@@ -373,7 +374,7 @@
                     name: m.name,
                     timing: m.time,
                     price: parseFloat(m.price).toFixed(2),
-                    img: poster || `https://via.placeholder.com/300x450?text=${encodeURIComponent(m.name)}`,
+                    img: poster || `https://placehold.co/300x450/1a1a1a/ffffff?text=${encodeURIComponent(m.name)}`,
                     region: loc
                 });
             }
@@ -482,8 +483,9 @@
                 card.className = 'movie-card';
                 card.innerHTML = `
                     <div class="movie-poster-wrap">
+                        <span style="z-index: 0">${s.name}</span>
                         <img src="${posterSrc}" class="movie-poster" alt="${s.name}" loading="lazy" 
-                             onerror="this.src='https://via.placeholder.com/300x450?text=${encodeURIComponent(s.name)}'">
+                             onerror="this.style.display='none';">
                     </div>
                     <div class="movie-info">
                         <h3>${s.name}</h3>
