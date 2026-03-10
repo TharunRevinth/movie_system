@@ -3,7 +3,8 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches:
-      - nextjs-bun-migration # Change this to 'master' if you merge there later
+      - nextjs-bun-migration
+      - master
 
 jobs:
   deploy:
