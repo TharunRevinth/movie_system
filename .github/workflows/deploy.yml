@@ -3,7 +3,6 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches:
-      - nextjs-bun-migration
       - master
 
 permissions:
@@ -21,30 +20,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Verify Secret Lengths
-        run: |
-          echo "TMDB_API_KEY length: ${#TMDB_API_KEY}"
-          echo "SUPABASE_URL length: ${#SUPABASE_URL}"
-          echo "SUPABASE_ANON_KEY length: ${#SUPABASE_ANON_KEY}"
-        env:
-          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
-          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
 
-      - name: Inject Secrets
-        env:
-          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
-          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-        run: |
-          node -e "
-          const fs = require('fs');
-          let content = fs.readFileSync('index.html', 'utf8');
-          content = content.split('TMDB_API_KEY_PLACEHOLDER').join(process.env.TMDB_API_KEY);
-          content = content.split('SUPABASE_URL_PLACEHOLDER').join(process.env.SUPABASE_URL);
-          content = content.split('SUPABASE_ANON_KEY_PLACEHOLDER').join(process.env.SUPABASE_ANON_KEY);
-          fs.writeFileSync('index.html', content);
-          "
+      - name: Build Project
+        run: npm run build
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
@@ -52,7 +34,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
+          path: './dist'
 
       - name: Deploy to GitHub Pages
         id: deployment
