@@ -257,7 +257,8 @@
             };
 
             // If injected by GitHub Actions, use those
-            if (githubEnv.TMDB_API_KEY !== 'TMDB_API_KEY_PLACEHOLDER') {
+            // We check if the placeholder string HAS BEEN REPLACED
+            if (githubEnv.TMDB_API_KEY && githubEnv.TMDB_API_KEY !== 'TMDB_API_KEY_PLACEHOLDER') {
                 Object.assign(env, githubEnv);
             } else {
                 // Otherwise try local .env for development
