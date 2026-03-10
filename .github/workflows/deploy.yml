@@ -19,11 +19,19 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Inject Secrets
+        env:
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
         run: |
-          # Using a different delimiter (!) to avoid issues with special characters in URLs/Keys
-          sed -i "s!TMDB_API_KEY_PLACEHOLDER!${{ secrets.TMDB_API_KEY }}!g" index.html
-          sed -i "s!SUPABASE_URL_PLACEHOLDER!${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}!g" index.html
-          sed -i "s!SUPABASE_ANON_KEY_PLACEHOLDER!${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}!g" index.html
+          node -e "
+          const fs = require('fs');
+          let content = fs.readFileSync('index.html', 'utf8');
+          content = content.replace('TMDB_API_KEY_PLACEHOLDER', process.env.TMDB_API_KEY);
+          content = content.replace('SUPABASE_URL_PLACEHOLDER', process.env.SUPABASE_URL);
+          content = content.replace('SUPABASE_ANON_KEY_PLACEHOLDER', process.env.SUPABASE_ANON_KEY);
+          fs.writeFileSync('index.html', content);
+          "
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
