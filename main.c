@@ -97,8 +97,8 @@ void EMSCRIPTEN_KEEPALIVE markSeat(int show_id, int r, int c, int state) {
 
 void EMSCRIPTEN_KEEPALIVE saveData() {
     char path1[128], path2[128];
-    sprintf(path1, "%sshows_v3.dat", DATA_PATH); // Renamed to v3 to avoid corruption
-    sprintf(path2, "%sbookings_v3.dat", DATA_PATH);
+    sprintf(path1, "%sshows_v4.dat", DATA_PATH); // Renamed to v3 to avoid corruption
+    sprintf(path2, "%sbookings_v4.dat", DATA_PATH);
 
     FILE *f1 = fopen(path1, "wb");
     if (f1) {
@@ -124,8 +124,8 @@ void EMSCRIPTEN_KEEPALIVE saveData() {
 
 void EMSCRIPTEN_KEEPALIVE loadData() {
     char path1[128], path2[128];
-    sprintf(path1, "%sshows_v3.dat", DATA_PATH);
-    sprintf(path2, "%sbookings_v3.dat", DATA_PATH);
+    sprintf(path1, "%sshows_v4.dat", DATA_PATH);
+    sprintf(path2, "%sbookings_v4.dat", DATA_PATH);
     
     num_shows = 0;
     num_bookings = 0;
