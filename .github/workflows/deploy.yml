@@ -18,11 +18,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Verify Secrets
+        run: |
+          if [ -z "${{ secrets.TMDB_API_KEY }}" ]; then echo "ERROR: TMDB_API_KEY is missing"; exit 1; fi
+          if [ -z "${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" ]; then echo "ERROR: NEXT_PUBLIC_SUPABASE_URL is missing"; exit 1; fi
+          if [ -z "${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" ]; then echo "ERROR: NEXT_PUBLIC_SUPABASE_ANON_KEY is missing"; exit 1; fi
+          echo "All secrets are present."
+
       - name: Inject Secrets
         run: |
-          sed -i "s|TMDB_API_KEY_PLACEHOLDER|${{ secrets.TMDB_API_KEY }}|g" index.html
-          sed -i "s|SUPABASE_URL_PLACEHOLDER|${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}|g" index.html
-          sed -i "s|SUPABASE_ANON_KEY_PLACEHOLDER|${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}|g" index.html
+          sed -i "s#TMDB_API_KEY_PLACEHOLDER#${{ secrets.TMDB_API_KEY }}#g" index.html
+          sed -i "s#SUPABASE_URL_PLACEHOLDER#${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}#g" index.html
+          sed -i "s#SUPABASE_ANON_KEY_PLACEHOLDER#${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}#g" index.html
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
