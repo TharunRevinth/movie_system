@@ -26,18 +26,27 @@ filesToCopy.forEach(file => {
     }
 });
 
-// Process index.html and inject environment variables
-console.log('Injecting environment variables into index.html...');
-let html = fs.readFileSync('index.html', 'utf8');
+// Process template.html and inject environment variables into the final index.html
+console.log('--- Environment Variable Check ---');
+const keys = ['TMDB_API_KEY', 'NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY'];
+keys.forEach(k => {
+    const val = process.env[k];
+    console.log(`${k}: ${val ? 'FOUND (Length: ' + val.length + ')' : 'NOT FOUND'}`);
+});
 
-// These must match the names you set in Netlify dashboard
+console.log('Injecting environment variables from template.html into dist/index.html...');
+let html = fs.readFileSync('template.html', 'utf8');
+
 const tmdbKey = process.env.TMDB_API_KEY || 'TMDB_API_KEY_PLACEHOLDER';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'SUPABASE_URL_PLACEHOLDER';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'SUPABASE_ANON_KEY_PLACEHOLDER';
 
-html = html.split('TMDB_API_KEY_PLACEHOLDER').join(tmdbKey);
-html = html.split('SUPABASE_URL_PLACEHOLDER').join(supabaseUrl);
-html = html.split('SUPABASE_ANON_KEY_PLACEHOLDER').join(supabaseAnonKey);
+// Log if we are using placeholders
+if (tmdbKey === 'TMDB_API_KEY_PLACEHOLDER') console.warn('WARNING: Using placeholder for TMDB_API_KEY');
+
+html = html.replace(/TMDB_API_KEY_PLACEHOLDER/g, tmdbKey);
+html = html.replace(/SUPABASE_URL_PLACEHOLDER/g, supabaseUrl);
+html = html.replace(/SUPABASE_ANON_KEY_PLACEHOLDER/g, supabaseAnonKey);
 
 fs.writeFileSync(path.join(dist, 'index.html'), html);
 
