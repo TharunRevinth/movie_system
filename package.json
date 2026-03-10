@@ -1,0 +1,9 @@
+{
+  "name": "cinebooking",
+  "version": "1.0.0",
+  "description": "CineBooking Movie Ticket System",
+  "main": "index.js",
+  "scripts": {
+    "build": "node build.js"
+  }
+}
