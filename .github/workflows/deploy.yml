@@ -1,0 +1,31 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches:
+      - nextjs-bun-migration # Change this to 'master' if you merge there later
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Inject Secrets
+        run: |
+          sed -i "s|TMDB_API_KEY_PLACEHOLDER|${{ secrets.TMDB_API_KEY }}|g" index.html
+          sed -i "s|SUPABASE_URL_PLACEHOLDER|${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}|g" index.html
+          sed -i "s|SUPABASE_ANON_KEY_PLACEHOLDER|${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}|g" index.html
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

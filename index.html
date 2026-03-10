@@ -229,36 +229,50 @@
         }
         
         async function loadEnv() {
-            try {
-                const response = await fetch('.env?v=' + Date.now());
-                if (!response.ok) return false;
-                const text = await response.text();
-                text.split(/\r?\n/).forEach(line => {
-                    const parts = line.split('=');
-                    if (parts.length >= 2) {
-                        const k = parts[0].trim();
-                        const v = parts.slice(1).join('=').trim();
-                        if (k && v) env[k] = v;
+            // Placeholders for GitHub Actions injection
+            const githubEnv = {
+                'TMDB_API_KEY': 'TMDB_API_KEY_PLACEHOLDER',
+                'NEXT_PUBLIC_SUPABASE_URL': 'SUPABASE_URL_PLACEHOLDER',
+                'NEXT_PUBLIC_SUPABASE_ANON_KEY': 'SUPABASE_ANON_KEY_PLACEHOLDER'
+            };
+
+            // If injected by GitHub Actions, use those
+            if (githubEnv.TMDB_API_KEY !== 'TMDB_API_KEY_PLACEHOLDER') {
+                Object.assign(env, githubEnv);
+            } else {
+                // Otherwise try local .env for development
+                try {
+                    const response = await fetch('.env?v=' + Date.now());
+                    if (response.ok) {
+                        const text = await response.text();
+                        text.split(/\r?\n/).forEach(line => {
+                            const parts = line.split('=');
+                            if (parts.length >= 2) {
+                                const k = parts[0].trim();
+                                const v = parts.slice(1).join('=').trim();
+                                if (k && v) env[k] = v;
+                            }
+                        });
                     }
-                });
-                tmdbKey = env['TMDB_API_KEY'];
-                if (env['NEXT_PUBLIC_SUPABASE_URL'] && env['NEXT_PUBLIC_SUPABASE_ANON_KEY']) {
-                    window.supabaseClient = supabase.createClient(env['NEXT_PUBLIC_SUPABASE_URL'], env['NEXT_PUBLIC_SUPABASE_ANON_KEY']);
-                    
-                    // Enable Realtime Listening
-                    window.supabaseClient
-                        .channel('schema-db-changes')
-                        .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, payload => {
-                            console.log('Realtime update received:', payload);
-                            // If we are currently looking at the movie that was updated, refresh the seats
-                            const currentMovieId = document.getElementById('bMovie').value;
-                            if (currentMovieId) fetchSeats();
-                            if (document.getElementById('occupancy').classList.contains('active')) refreshOccupancy();
-                        })
-                        .subscribe();
-                }
-                return true;
-            } catch (e) { console.error(e); return false; }
+                } catch (e) { console.warn("Local .env not found"); }
+            }
+
+            tmdbKey = env['TMDB_API_KEY'];
+            if (env['NEXT_PUBLIC_SUPABASE_URL'] && env['NEXT_PUBLIC_SUPABASE_ANON_KEY']) {
+                window.supabaseClient = supabase.createClient(env['NEXT_PUBLIC_SUPABASE_URL'], env['NEXT_PUBLIC_SUPABASE_ANON_KEY']);
+                
+                // Enable Realtime Listening
+                window.supabaseClient
+                    .channel('schema-db-changes')
+                    .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, payload => {
+                        console.log('Realtime update received:', payload);
+                        const currentMovieId = document.getElementById('bMovie').value;
+                        if (currentMovieId) fetchSeats();
+                        if (document.getElementById('occupancy').classList.contains('active')) refreshOccupancy();
+                    })
+                    .subscribe();
+            }
+            return true;
         }
 
         function hashString(str) {
