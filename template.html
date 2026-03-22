@@ -214,6 +214,7 @@
             <div class="header"><h2>Reservation</h2></div>
             <div id="book-layout">
                 <div class="box">
+                    <div class="form-group"><label>Date</label><select id="bDate" onchange="fetchSeats()"></select></div>
                     <div class="form-group"><label>Movie</label><select id="bMovie" onchange="updateTimingOptions()"></select></div>
                     <div id="timingContainer" class="form-group" style="display: none;"><label>Showtime</label><select id="bTiming" onchange="fetchSeats()"></select></div>
                     <div class="form-group"><label>Your Name</label><input type="text" id="bName" placeholder="Full name"></div>
@@ -302,6 +303,16 @@
         function showToast(m, s=false) { const t=document.getElementById("toast"); if(!t)return; t.innerText=m; t.className="show"; setTimeout(()=>t.className="", 3000); }
         function closeConfirmModal() { document.getElementById('confirm-modal').style.display = 'none'; switchTab('movies'); }
         
+        function populateDates() {
+            const sel = document.getElementById('bDate'); if(!sel) return; sel.innerHTML = "";
+            for(let i=0; i<7; i++) {
+                const d = new Date(); d.setDate(d.getDate() + i);
+                const iso = d.toISOString().split('T')[0];
+                const label = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                sel.innerHTML += `<option value="${iso}">${label}${i===0?' (Today)':''}</option>`;
+            }
+        }
+
         async function switchTab(tabId) { 
             document.querySelectorAll('.tab-content').forEach(el=>el.classList.remove('active')); 
             document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active')); 
@@ -314,7 +325,7 @@
             if(map[tabId] !== undefined && items[map[tabId]]) items[map[tabId]].classList.add('active');
             if(tabId === 'occupancy' && document.getElementById('adminTabBtn')) document.getElementById('adminTabBtn').classList.add('active');
             if(tabId === 'movies') refreshShows();
-            else if(tabId === 'book') populateBookDropdown();
+            else if(tabId === 'book') { populateDates(); populateBookDropdown(); }
             else if(tabId === 'receipt') fetchBookingHistory();
             else if(tabId === 'occupancy') refreshOccupancy();
         }
@@ -383,11 +394,12 @@
         function updateTimingOptions() { const n = document.getElementById('bMovie').value, c = document.getElementById('timingContainer'), s = document.getElementById('bTiming'); if(!n) { c.style.display = 'none'; return; } s.innerHTML = "<option value=''>-- Choose Time --</option>"; shows.filter(x => x.name === n).forEach(x => s.innerHTML += `<option value="${x.id}">${x.timing} (₹${x.price})</option>`); c.style.display = 'block'; }
 
         async function fetchSeats() { 
-            const id = document.getElementById('bTiming').value; if(!id) return; 
+            const id = document.getElementById('bTiming').value, dt = document.getElementById('bDate').value; 
+            if(!id || !dt) return; 
             currentSeats=[]; selectedSeats=[]; updateSelectedSeatsInfo(); 
             if(Module.ccall) Module.ccall('getSeatLayout', null, ['number'], [parseInt(id)]); 
             if(window.supabaseClient) {
-                const { data } = await window.supabaseClient.from('bookings').select('seats').eq('show_id', parseInt(id));
+                const { data } = await window.supabaseClient.from('bookings').select('seats').eq('show_id', parseInt(id)).eq('show_date', dt);
                 if(data) data.forEach(b => { b.seats.split('-').forEach(si => { const [r, c] = si.split(',').map(Number); const ex = currentSeats.find(x => x.r === r && x.c === c); if(ex) ex.s = 1; else currentSeats.push({r, c, s: 1}); }); });
                 renderSeatGrid();
             }
@@ -405,10 +417,10 @@
         function initiatePayment() { if(!currentUser) return toggleAuthModal(); const id = document.getElementById('bTiming').value, n = document.getElementById('bName').value.trim(); if(!id || !n || selectedSeats.length===0) return showToast("Select seats"); const s = shows.find(x => x.id == id); const total = (parseFloat(s.price) * selectedSeats.length).toFixed(2); document.getElementById('payAmount').innerText = `₹${total}`; const qr = document.getElementById('payQr'); qr.innerHTML = ""; new QRCode(qr, { text: `upi://pay?pa=cinebooking@upi&am=${total}`, width: 140, height: 140 }); document.getElementById('payment-modal').style.display = 'flex'; }
         
         async function processBooking() { 
-            const id = document.getElementById('bTiming').value, n = document.getElementById('bName').value.trim(); 
+            const id = document.getElementById('bTiming').value, n = document.getElementById('bName').value.trim(), dt = document.getElementById('bDate').value; 
             const sid = Math.random().toString(36).toUpperCase().slice(2, 8); const s = shows.find(x => x.id == id); const sl = selectedSeats.map(x=>`${x.r},${x.c}`).join('-');
             try {
-                if(window.supabaseClient) await window.supabaseClient.from('bookings').insert({ id_short: sid, show_id: parseInt(id), customer_name: n, num_seats: selectedSeats.length, seats: sl, total_amount: parseFloat(s.price)*selectedSeats.length, user_email: currentUser.email, status: 'pending' }); 
+                if(window.supabaseClient) await window.supabaseClient.from('bookings').insert({ id_short: sid, show_id: parseInt(id), show_date: dt, customer_name: n, num_seats: selectedSeats.length, seats: sl, total_amount: parseFloat(s.price)*selectedSeats.length, user_email: currentUser.email, status: 'pending' }); 
                 if(window.Module?.ccall) Module.ccall('bookTickets', null, ['number', 'string', 'number', 'string', 'string'], [parseInt(id), n, selectedSeats.length, sl, sid]);
                 document.getElementById('payment-modal').style.display = 'none'; document.getElementById('resId').innerText = sid; document.getElementById('confirm-modal').style.display = 'flex';
                 selectedSeats = []; updateSelectedSeatsInfo(); fetchBookingHistory(); 
@@ -424,7 +436,7 @@
                 data.forEach(b => {
                     const show = shows.find(x => x.id == b.show_id);
                     const c = document.createElement('div'); c.className = "history-card"; c.onclick = () => { document.getElementById('vBookingId').value = b.id_short; fetchReceipt(); };
-                    c.innerHTML = `<h4>#${b.id_short} - ${(b.status||'PENDING').toUpperCase()}</h4><p>${show?.name || 'Movie'}</p><p>₹${b.total_amount}</p>`; g.appendChild(c);
+                    c.innerHTML = `<h4>#${b.id_short} - ${(b.status||'PENDING').toUpperCase()}</h4><p><b>${show?.name || 'Movie'}</b></p><p>📅 ${b.show_date || 'N/A'}</p><p>₹${b.total_amount}</p>`; g.appendChild(c);
                 });
             } catch(e) { g.innerHTML = "Error loading history"; }
         }
@@ -442,8 +454,7 @@
 
         function renderTicket(b) {
             const s = shows.find(x => x.id == b.show_id), ra = document.getElementById('receiptArea'), conf = b.status === 'confirmed';
-            ra.innerHTML = `<div class="receipt-card"><div class="receipt-top"><h2>CINEBOOKING</h2><p>${conf?'ADMISSION':'PENDING'}</p></div>
-<div class="receipt-body"><div class="receipt-row"><span>Ref</span><b>#${b.id_short}</b></div><div class="receipt-row"><span>Guest</span><b>${b.customer_name}</b></div><div class="receipt-row"><span>Movie</span><b>${s?.name || 'Movie'}</b></div><div class="receipt-row"><span>Time</span><b>${s?.timing || '---'}</b></div><div id="tqr" style="text-align:center; margin-top:15px; opacity:${conf?1:0.2}"></div><div style="display:flex; gap:10px; margin-top:20px"><button class="btn btn-primary" onclick="window.print()" ${!conf?'disabled':''}>Print</button><button class="btn btn-outline" onclick="doCancelTicket('${b.id_short}')">Cancel</button></div></div></div>`;
+            ra.innerHTML = `<div class="receipt-card"><div class="receipt-top"><h2>CINEBOOKING</h2><p>${conf?'ADMISSION':'PENDING'}</p></div><div class="receipt-body"><div class="receipt-row"><span>Ref</span><b>#${b.id_short}</b></div><div class="receipt-row"><span>Guest</span><b>${b.customer_name}</b></div><div class="receipt-row"><span>Movie</span><b>${s?.name || 'Movie'}</b></div><div class="receipt-row"><span>Date</span><b>${b.show_date || 'N/A'}</b></div><div class="receipt-row"><span>Time</span><b>${s?.timing || '---'}</b></div><div id="tqr" style="text-align:center; margin-top:15px; opacity:${conf?1:0.2}"></div><div style="display:flex; gap:10px; margin-top:20px"><button class="btn btn-primary" onclick="window.print()" ${!conf?'disabled':''}>Print</button><button class="btn btn-outline" onclick="doCancelTicket('${b.id_short}')">Cancel</button></div></div></div>`;
             ra.style.display = 'block'; ra.scrollIntoView();
             new QRCode(document.getElementById("tqr"), { text: window.location.origin + window.location.pathname + "?ticket=" + b.id_short, width: 100, height: 100 });
         }
