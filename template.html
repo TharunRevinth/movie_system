@@ -509,15 +509,45 @@
         async function toggleScanner() {
             const r = document.getElementById('reader'), b = document.getElementById('scanCtrlBtn');
             if (r.style.display === 'none') {
-                r.style.display = 'block'; b.innerText = "Close";
+                r.style.display = 'block'; b.innerText = "Close Scanner";
                 if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
+                
+                const config = { 
+                    fps: 20, 
+                    qrbox: (viewWidth, viewHeight) => {
+                        const minEdge = Math.min(viewWidth, viewHeight);
+                        const boxSize = Math.floor(minEdge * 0.7);
+                        return { width: boxSize, height: boxSize };
+                    },
+                    aspectRatio: 1.0
+                };
+
                 try {
-                    await html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, async (t) => {
+                    await html5QrCode.start({ facingMode: "environment" }, config, async (t) => {
+                        console.log("Raw Scan Captured:", t);
                         let id = t;
-                        if (t.includes('?ticket=')) id = new URLSearchParams(t.split('?')[1]).get('ticket');
-                        await stopScanner(); switchTab('receipt'); document.getElementById('vBookingId').value = id; fetchReceipt();
+                        
+                        // Robust ID Extraction Logic
+                        if (t.includes('ticket=')) {
+                            const match = t.match(/ticket=([A-Z0-9]{6})/i);
+                            if (match) id = match[1];
+                        } else if (t.includes('/')) {
+                            const parts = t.split('/');
+                            id = parts[parts.length - 1].substring(0, 6);
+                        }
+                        
+                        showToast("Scan Success: " + id, true);
+                        if (navigator.vibrate) navigator.vibrate(100);
+                        
+                        await stopScanner();
+                        switchTab('receipt');
+                        document.getElementById('vBookingId').value = id.toUpperCase();
+                        fetchReceipt();
                     });
-                } catch (e) { showToast("Camera Error"); }
+                } catch (e) { 
+                    console.error("Camera Start Error:", e);
+                    showToast("Camera Error: Check Permissions"); 
+                }
             }
             else { r.style.display = 'none'; b.innerText = "Open Camera"; await stopScanner(); }
         }
