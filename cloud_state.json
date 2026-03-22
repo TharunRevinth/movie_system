@@ -1,0 +1,244 @@
+{
+  "shows": [
+    {
+      "id": 1828606822,
+      "name": "Kalki 2898 AD",
+      "timing": "10:30 AM",
+      "price": 250,
+      "img": null,
+      "region": null,
+      "created_at": "2026-03-22T09:47:29.185287+00:00"
+    },
+    {
+      "id": 974373109,
+      "name": "Kalki 2898 AD",
+      "timing": "01:45 PM",
+      "price": 250,
+      "img": null,
+      "region": null,
+      "created_at": "2026-03-22T09:47:29.185287+00:00"
+    },
+    {
+      "id": 225577498,
+      "name": "Kalki 2898 AD",
+      "timing": "05:00 PM",
+      "price": 350,
+      "img": null,
+      "region": null,
+      "created_at": "2026-03-22T09:47:29.185287+00:00"
+    },
+    {
+      "id": 2889161017,
+      "name": "Kalki 2898 AD",
+      "timing": "08:15 PM",
+      "price": 250,
+      "img": null,
+      "region": null,
+      "created_at": "2026-03-22T09:47:29.185287+00:00"
+    },
+    {
+      "id": 2716110968,
+      "name": "Kalki 2898 AD",
+      "timing": "11:30 PM",
+      "price": 250,
+      "img": null,
+      "region": null,
+      "created_at": "2026-03-22T09:47:29.185287+00:00"
+    },
+    {
+      "id": 2699368369,
+      "name": "Pushpa 2",
+      "timing": "10:30 AM",
+      "price": 250,
+      "img": null,
+      "region": null,
+      "created_at": "2026-03-22T09:47:29.185287+00:00"
+    },
+    {
+      "id": 1845134656,
+      "name": "Pushpa 2",
+      "timing": "01:45 PM",
+      "price": 250,
+      "img": null,
+      "region": null,
+      "created_at": "2026-03-22T09:47:29.185287+00:00"
+    },
+    {
+      "id": 1096339045,
+      "name": "Pushpa 2",
+      "timing": "05:00 PM",
+      "price": 350,
+      "img": null,
+      "region": null,
+      "created_at": "2026-03-22T09:47:29.185287+00:00"
+    },
+    {
+      "id": 3759922564,
+      "name": "Pushpa 2",
+      "timing": "08:15 PM",
+      "price": 250,
+      "img": null,
+      "region": null,
+      "created_at": "2026-03-22T09:47:29.185287+00:00"
+    },
+    {
+      "id": 3586872515,
+      "name": "Pushpa 2",
+      "timing": "11:30 PM",
+      "price": 250,
+      "img": null,
+      "region": null,
+      "created_at": "2026-03-22T09:47:29.185287+00:00"
+    },
+    {
+      "id": 640681463,
+      "name": "Stree 2",
+      "timing": "10:30 AM",
+      "price": 250,
+      "img": null,
+      "region": null,
+      "created_at": "2026-03-22T09:47:29.185287+00:00"
+    },
+    {
+      "id": 213552250,
+      "name": "Stree 2",
+      "timing": "01:45 PM",
+      "price": 250,
+      "img": null,
+      "region": null,
+      "created_at": "2026-03-22T09:47:29.185287+00:00"
+    },
+    {
+      "id": 962347861,
+      "name": "Stree 2",
+      "timing": "05:00 PM",
+      "price": 350,
+      "img": null,
+      "region": null,
+      "created_at": "2026-03-22T09:47:29.185287+00:00"
+    },
+    {
+      "id": 1701235658,
+      "name": "Stree 2",
+      "timing": "08:15 PM",
+      "price": 250,
+      "img": null,
+      "region": null,
+      "created_at": "2026-03-22T09:47:29.185287+00:00"
+    },
+    {
+      "id": 1528185609,
+      "name": "Stree 2",
+      "timing": "11:30 PM",
+      "price": 250,
+      "img": null,
+      "region": null,
+      "created_at": "2026-03-22T09:47:29.185287+00:00"
+    },
+    {
+      "id": 1272034457,
+      "name": "Singham Again",
+      "timing": "10:30 AM",
+      "price": 250,
+      "img": null,
+      "region": null,
+      "created_at": "2026-03-22T09:47:29.185287+00:00"
+    },
+    {
+      "id": 417800744,
+      "name": "Singham Again",
+      "timing": "01:45 PM",
+      "price": 250,
+      "img": null,
+      "region": null,
+      "created_at": "2026-03-22T09:47:29.185287+00:00"
+    },
+    {
+      "id": 330994867,
+      "name": "Singham Again",
+      "timing": "05:00 PM",
+      "price": 350,
+      "img": null,
+      "region": null,
+      "created_at": "2026-03-22T09:47:29.185287+00:00"
+    },
+    {
+      "id": 2332588652,
+      "name": "Singham Again",
+      "timing": "08:15 PM",
+      "price": 250,
+      "img": null,
+      "region": null,
+      "created_at": "2026-03-22T09:47:29.185287+00:00"
+    },
+    {
+      "id": 2159538603,
+      "name": "Singham Again",
+      "timing": "11:30 PM",
+      "price": 250,
+      "img": null,
+      "region": null,
+      "created_at": "2026-03-22T09:47:29.185287+00:00"
+    },
+    {
+      "id": 2823635408,
+      "name": "Animal",
+      "timing": "10:30 AM",
+      "price": 250,
+      "img": null,
+      "region": null,
+      "created_at": "2026-03-22T09:47:29.185287+00:00"
+    },
+    {
+      "id": 1969401695,
+      "name": "Animal",
+      "timing": "01:45 PM",
+      "price": 250,
+      "img": null,
+      "region": null,
+      "created_at": "2026-03-22T09:47:29.185287+00:00"
+    },
+    {
+      "id": 1220606084,
+      "name": "Animal",
+      "timing": "05:00 PM",
+      "price": 350,
+      "img": null,
+      "region": null,
+      "created_at": "2026-03-22T09:47:29.185287+00:00"
+    },
+    {
+      "id": 3884189603,
+      "name": "Animal",
+      "timing": "08:15 PM",
+      "price": 250,
+      "img": null,
+      "region": null,
+      "created_at": "2026-03-22T09:47:29.185287+00:00"
+    },
+    {
+      "id": 3711139554,
+      "name": "Animal",
+      "timing": "11:30 PM",
+      "price": 250,
+      "img": null,
+      "region": null,
+      "created_at": "2026-03-22T09:47:29.185287+00:00"
+    }
+  ],
+  "bookings": [
+    {
+      "id": "be4286e4-bf1e-499b-8904-ed7bf050759a",
+      "id_short": "GB0F1F",
+      "show_id": 1845134656,
+      "customer_name": "sad",
+      "num_seats": 1,
+      "seats": "4,0",
+      "total_amount": 250,
+      "user_email": "alpha14@gmail.com",
+      "status": "confirmed",
+      "created_at": "2026-03-22T11:21:37.960626+00:00",
+      "show_date": "2026-03-22"
+    }
+  ]
+}

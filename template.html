@@ -25,6 +25,7 @@
             --green: #10B981; 
             --shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
             --container-padding: clamp(1rem, 5vw, 4rem);
+            
             --screen-color: #ffffff;
             --screen-glow: rgba(255, 255, 255, 0.4);
             --seat-base: #222;
@@ -44,6 +45,7 @@
                 --glass: rgba(0, 0, 0, 0.02);
                 --glass-border: rgba(0, 0, 0, 0.08);
                 --shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+                
                 --screen-color: #94A3B8;
                 --screen-glow: rgba(15, 23, 42, 0.1);
                 --seat-base: #E2E8F0;
@@ -409,7 +411,7 @@
             if(Module.ccall) Module.ccall('getSeatLayout', null, ['number'], [parseInt(id)]); 
             if(window.supabaseClient) {
                 const { data } = await window.supabaseClient.from('bookings').select('seats').eq('show_id', parseInt(id)).eq('show_date', dt);
-                if(data) data.forEach(b => { b.seats.split('-').forEach(si => { const [r, c] = si.split(',').map(Number); const ex = currentSeats.find(x => x.r === r && x.c === c); if(ex) ex.s = 1; else currentSeats.push({r, c, s: 1}); }); });
+                if(data) data.forEach(b => { if(b.seats) b.seats.split('-').forEach(si => { const [r, c] = si.split(',').map(Number); const ex = currentSeats.find(x => x.r === r && x.c === c); if(ex) ex.s = 1; else currentSeats.push({r, c, s: 1}); }); });
                 renderSeatGrid();
             }
         }
@@ -480,38 +482,17 @@
                 try {
                     const { data, error } = await window.supabaseClient.from('bookings').select('*').eq('show_date', dt);
                     if(error) throw error;
-                    
-                    // 1. Reset all seats in WASM first
-                    shows.forEach(s => {
-                        for(let r=0; r<5; r++) {
-                            for(let c=0; c<10; c++) {
-                                Module.ccall('markSeat', null, ['number','number','number','number'], [parseInt(s.id), r, c, 0]);
-                            }
-                        }
-                    });
-
-                    // 2. Sync database bookings for THIS DATE into WASM and fill approvals
+                    shows.forEach(s => { for(let r=0; r<5; r++) for(let c=0; c<10; c++) Module.ccall('markSeat', null, ['number','number','number','number'], [parseInt(s.id), r, c, 0]); });
                     if(data) {
                         b.innerHTML = ""; 
                         let pendingCount = 0;
                         data.forEach(bk => {
-                            if(bk.seats) {
-                                bk.seats.split('-').forEach(si => {
-                                    const [r, c] = si.split(',').map(Number);
-                                    Module.ccall('markSeat', null, ['number','number','number','number'], [parseInt(bk.show_id), r, c, 1]);
-                                });
-                            }
-                            if(bk.status === 'pending') {
-                                pendingCount++;
-                                a.innerHTML += `<tr><td>#${bk.id_short}</td><td><b>${bk.customer_name}</b></td><td>${bk.show_id}</td><td>₹${bk.total_amount}</td><td><button class="btn btn-primary" style="padding:8px 16px; font-size:0.75rem" onclick="verifyPayment('${bk.id_short}')">Verify</button></td></tr>`;
-                            }
+                            if(bk.seats) bk.seats.split('-').forEach(si => { const [r, c] = si.split(',').map(Number); Module.ccall('markSeat', null, ['number','number','number','number'], [parseInt(bk.show_id), r, c, 1]); });
+                            if(bk.status === 'pending') { pendingCount++; a.innerHTML += `<tr><td>#${bk.id_short}</td><td><b>${bk.customer_name}</b></td><td>${bk.show_id}</td><td>₹${bk.total_amount}</td><td><button class="btn btn-primary" onclick="verifyPayment('${bk.id_short}')">Verify</button></td></tr>`; }
                         });
                         if(pendingCount === 0) a.innerHTML = "<tr><td colspan='5' style='text-align:center; color:var(--muted); padding:30px;'>No pending payments</td></tr>";
                     }
-                } catch(e) {
-                    console.error("Occupancy Sync Error:", e);
-                    showToast("Database Sync Error");
-                }
+                } catch(e) { showToast("Database Error"); }
             }
             if(Module.ccall) Module.ccall('getOccupancyReport', null, [], []); 
         }
@@ -534,9 +515,7 @@
                 fetchMovies(); 
                 const urlParams = new URLSearchParams(window.location.search);
                 const ticketId = urlParams.get('ticket');
-                if (ticketId) {
-                    setTimeout(() => { switchTab('receipt'); document.getElementById('vBookingId').value = ticketId; fetchReceipt(); }, 1000);
-                }
+                if (ticketId) { setTimeout(() => { switchTab('receipt'); document.getElementById('vBookingId').value = ticketId; fetchReceipt(); }, 1000); }
             } 
         };
 
@@ -547,14 +526,10 @@
             if(!e || !p) return showToast("Enter credentials");
             if(!window.supabaseClient) return showToast("DB Not Connected");
             try {
-                if(authMode === 'register') {
-                    const { error } = await window.supabaseClient.from('user_accounts').insert({ email: e, password: p, role: 'user' }).select();
-                    if(error) throw error;
-                    showToast("Created! Log In", true); setAuthMode('login');
-                } else {
+                if(authMode === 'register') { await window.supabaseClient.from('user_accounts').insert({ email: e, password: p, role: 'user' }).select(); showToast("Created! Log In", true); setAuthMode('login'); }
+                else {
                     const { data, error } = await window.supabaseClient.from('user_accounts').select('*').eq('email', e).eq('password', p).maybeSingle();
-                    if(error) throw error;
-                    if(!data) throw { message: "Invalid Credentials" };
+                    if(error || !data) throw { message: "Invalid Credentials" };
                     currentUser = data; document.getElementById('userStateBtn').innerText = "Log Out";
                     if(data.role === 'admin') document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'block');
                     document.getElementById('auth-modal').style.display = 'none'; showToast("Welcome " + e, true);
@@ -567,43 +542,14 @@
             if (r.style.display === 'none') {
                 r.style.display = 'block'; b.innerText = "Close Scanner";
                 if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
-                
-                const config = { 
-                    fps: 20, 
-                    qrbox: (viewWidth, viewHeight) => {
-                        const minEdge = Math.min(viewWidth, viewHeight);
-                        const boxSize = Math.floor(minEdge * 0.7);
-                        return { width: boxSize, height: boxSize };
-                    },
-                    aspectRatio: 1.0
-                };
-
+                const config = { fps: 20, qrbox: (viewWidth, viewHeight) => { const minEdge = Math.min(viewWidth, viewHeight); const boxSize = Math.floor(minEdge * 0.7); return { width: boxSize, height: boxSize }; } };
                 try {
                     await html5QrCode.start({ facingMode: "environment" }, config, async (t) => {
-                        console.log("Raw Scan Captured:", t);
                         let id = t;
-                        
-                        // Robust ID Extraction Logic
-                        if (t.includes('ticket=')) {
-                            const match = t.match(/ticket=([A-Z0-9]{6})/i);
-                            if (match) id = match[1];
-                        } else if (t.includes('/')) {
-                            const parts = t.split('/');
-                            id = parts[parts.length - 1].substring(0, 6);
-                        }
-                        
-                        showToast("Scan Success: " + id, true);
-                        if (navigator.vibrate) navigator.vibrate(100);
-                        
-                        await stopScanner();
-                        switchTab('receipt');
-                        document.getElementById('vBookingId').value = id.toUpperCase();
-                        fetchReceipt();
+                        if (t.includes('ticket=')) { const match = t.match(/ticket=([A-Z0-9]{6})/i); if (match) id = match[1]; }
+                        await stopScanner(); switchTab('receipt'); document.getElementById('vBookingId').value = id.toUpperCase(); fetchReceipt();
                     });
-                } catch (e) { 
-                    console.error("Camera Start Error:", e);
-                    showToast("Camera Error: Check Permissions"); 
-                }
+                } catch (e) { showToast("Camera Error"); }
             }
             else { r.style.display = 'none'; b.innerText = "Open Camera"; await stopScanner(); }
         }

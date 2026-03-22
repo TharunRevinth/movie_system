@@ -4,6 +4,11 @@
   "description": "CineBooking Movie Ticket System",
   "main": "index.js",
   "scripts": {
-    "build": "node build.js"
+    "build": "node build.js",
+    "sync": "node sync.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.99.3",
+    "dotenv": "^16.6.1"
   }
 }

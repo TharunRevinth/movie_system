@@ -1,20 +1,24 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
-#ifdef __EMSCRIPTEN__
-#include <emscripten.h>
-#define DATA_PATH "/data/"
-#else
-#include <unistd.h>
 #define DATA_PATH "./"
-#define EMSCRIPTEN_KEEPALIVE
-#endif
-
 #define MAX_SHOWS 200
 #define MAX_BOOKINGS 500
 #define ROWS 5
 #define COLS 10
+
+// ANSI Colors
+#define RED   "\x1B[31m"
+#define GRN   "\x1B[32m"
+#define YEL   "\x1B[33m"
+#define BLU   "\x1B[34m"
+#define MAG   "\x1B[35m"
+#define CYN   "\x1B[36m"
+#define WHT   "\x1B[37m"
+#define RESET "\x1B[0m"
+#define BOLD  "\x1B[1m"
 
 typedef struct {
     int show_id;
@@ -22,8 +26,8 @@ typedef struct {
     char timing[32];
     float price;
     char img_url[256];
-    char region[32]; // Added region field
-    int seats[ROWS][COLS];
+    char region[32];
+    int seats[ROWS][COLS]; // Runtime cache
 } Show;
 
 typedef struct {
@@ -34,6 +38,9 @@ typedef struct {
     int seat_rows[20];
     int seat_cols[20];
     float total_amount;
+    char user_email[64];
+    char status[16];
+    char show_date[16]; // YYYY-MM-DD
 } Booking;
 
 Show shows[MAX_SHOWS];
@@ -41,279 +48,176 @@ int num_shows = 0;
 Booking bookings[MAX_BOOKINGS];
 int num_bookings = 0;
 
+// Forward declarations
 void saveData();
 void loadData();
 
-// --- WASM Sync Functions ---
+// --- Core Logic ---
 
-void EMSCRIPTEN_KEEPALIVE clearShows() {
-    num_shows = 0;
-    memset(shows, 0, sizeof(shows));
-}
+void markSeatsFromBookings() {
+    // Reset all seats to available
+    for(int s=0; s<num_shows; s++)
+        for(int r=0; r<ROWS; r++)
+            for(int c=0; c<COLS; c++)
+                shows[s].seats[r][c] = 0;
 
-void EMSCRIPTEN_KEEPALIVE addOrUpdateShow(int id, char* name, char* timing, float price, char* img, char* region) {
-    int idx = -1;
-    for (int i = 0; i < num_shows; i++) {
-        if (shows[i].show_id == id) {
-            idx = i;
-            break;
-        }
-    }
-
-    if (idx == -1) {
-        if (num_shows >= MAX_SHOWS) return;
-        idx = num_shows++;
-        memset(shows[idx].seats, 0, sizeof(shows[idx].seats));
-    }
-
-    shows[idx].show_id = id;
-    strncpy(shows[idx].movie_name, name, 63);
-    strcpy(shows[idx].timing, timing);
-    shows[idx].price = price;
-    strncpy(shows[idx].img_url, img, 255);
-    strncpy(shows[idx].region, region, 31);
-}
-
-void EMSCRIPTEN_KEEPALIVE resetSystem() {
-    num_shows = 0;
-    num_bookings = 0;
-    memset(shows, 0, sizeof(shows));
-    memset(bookings, 0, sizeof(bookings));
-    saveData();
-    printf("MSG|System Reset Success\n");
-    fflush(stdout);
-}
-
-void EMSCRIPTEN_KEEPALIVE markSeat(int show_id, int r, int c, int state) {
-    for (int i = 0; i < num_shows; i++) {
-        if (shows[i].show_id == show_id) {
-            if (r >= 0 && r < ROWS && c >= 0 && c < COLS) {
-                shows[i].seats[r][c] = state;
-            }
-            return;
-        }
-    }
-}
-
-void EMSCRIPTEN_KEEPALIVE saveData() {
-#ifndef __EMSCRIPTEN__
-    char path1[128], path2[128];
-    sprintf(path1, "%sshows_v4.dat", DATA_PATH); 
-    sprintf(path2, "%sbookings_v4.dat", DATA_PATH);
-
-    FILE *f1 = fopen(path1, "wb");
-    if (f1) {
-        fwrite(&num_shows, sizeof(int), 1, f1);
-        fwrite(shows, sizeof(Show), num_shows, f1);
-        fclose(f1);
-    }
-    FILE *f2 = fopen(path2, "wb");
-    if (f2) {
-        fwrite(&num_bookings, sizeof(int), 1, f2);
-        fwrite(bookings, sizeof(Booking), num_bookings, f2);
-        fclose(f2);
-    }
-#endif
-}
-
-void EMSCRIPTEN_KEEPALIVE loadData() {
-    num_shows = 0;
-    num_bookings = 0;
-    memset(shows, 0, sizeof(shows));
-    memset(bookings, 0, sizeof(bookings));
-
-#ifndef __EMSCRIPTEN__
-    char path1[128], path2[128];
-    sprintf(path1, "%sshows_v4.dat", DATA_PATH);
-    sprintf(path2, "%sbookings_v4.dat", DATA_PATH);
-    
-    FILE *f1 = fopen(path1, "rb");
-    if (f1) {
-        int loaded_num = 0;
-        if (fread(&loaded_num, sizeof(int), 1, f1) == 1) {
-            if (loaded_num >= 0 && loaded_num <= MAX_SHOWS) {
-                num_shows = loaded_num;
-                fread(shows, sizeof(Show), num_shows, f1);
-            }
-        }
-        fclose(f1);
-    }
-    
-    FILE *f2 = fopen(path2, "rb");
-    if (f2) {
-        int loaded_bookings = 0;
-        if (fread(&loaded_bookings, sizeof(int), 1, f2) == 1) {
-            if (loaded_bookings >= 0 && loaded_bookings <= MAX_BOOKINGS) {
-                num_bookings = loaded_bookings;
-                fread(bookings, sizeof(Booking), num_bookings, f2);
-            }
-        }
-        fclose(f2);
-    }
-#endif
-}
-
-void EMSCRIPTEN_KEEPALIVE getShows() {
-    for (int i = 0; i < num_shows; i++) {
-        printf("SHOW|%d|%s|%s|%.2f|%s|%s\n", shows[i].show_id, shows[i].movie_name, shows[i].timing, shows[i].price, shows[i].img_url, shows[i].region);
-    }
-    fflush(stdout);
-}
-
-void EMSCRIPTEN_KEEPALIVE getSeatLayout(int show_id) {
-    int idx = -1;
-    for (int i = 0; i < num_shows; i++) if (shows[i].show_id == show_id) idx = i;
-    if (idx == -1) return;
-    for (int r = 0; r < ROWS; r++) { for (int c = 0; c < COLS; c++) printf("SEAT|%d|%d|%d\n", r, c, shows[idx].seats[r][c]); }
-    printf("SEAT_DONE|%d\n", show_id); fflush(stdout);
-}
-
-void EMSCRIPTEN_KEEPALIVE bookTickets(int show_id, char* cust_name, int num_seats, char* seat_list, char* b_id) {
-    int idx = -1;
-    for (int i = 0; i < num_shows; i++) if (shows[i].show_id == show_id) idx = i;
-    if (idx == -1 || num_bookings >= MAX_BOOKINGS) return;
-
-    int r_list[20], c_list[20], parsed = 0;
-    char *copy = strdup(seat_list), *token = strtok(copy, "-");
-    while (token != NULL && parsed < num_seats) {
-        int r, c; if (sscanf(token, "%d,%d", &r, &c) == 2) { r_list[parsed] = r; c_list[parsed] = c; parsed++; }
-        token = strtok(NULL, "-");
-    }
-    free(copy);
-
-    strncpy(bookings[num_bookings].booking_id, b_id, 15);
-    strncpy(bookings[num_bookings].customer_name, cust_name, 63);
-    bookings[num_bookings].show_id = show_id;
-    bookings[num_bookings].num_seats = parsed;
-    bookings[num_bookings].total_amount = shows[idx].price * parsed;
-    for (int i = 0; i < parsed; i++) {
-        bookings[num_bookings].seat_rows[i] = r_list[i];
-        bookings[num_bookings].seat_cols[i] = c_list[i];
-        shows[idx].seats[r_list[i]][c_list[i]] = 1;
-    }
-    num_bookings++; saveData();
-    printf("SUCCESS_BOOKING|%s|%.2f|%s\n", b_id, shows[idx].price * parsed, cust_name); fflush(stdout);
-}
-
-void EMSCRIPTEN_KEEPALIVE viewBooking(char* booking_id) {
-    for (int i = 0; i < num_bookings; i++) {
-        if (strcmp(bookings[i].booking_id, booking_id) == 0) {
-            int s_idx = -1;
-            for (int j = 0; j < num_shows; j++) if (shows[j].show_id == bookings[i].show_id) s_idx = j;
-            if (s_idx != -1) {
-                printf("RECEIPT|%s|%s|%s|%s|%d|%.2f|", bookings[i].booking_id, bookings[i].customer_name, shows[s_idx].movie_name, shows[s_idx].timing, bookings[i].num_seats, bookings[i].total_amount);
-                for (int k = 0; k < bookings[i].num_seats; k++) printf("R%d C%d%s", bookings[i].seat_rows[k]+1, bookings[i].seat_cols[k]+1, (k==bookings[i].num_seats-1)?"":", ");
-                printf("\n"); fflush(stdout); return;
+    // Repopulate from booking file
+    for(int b=0; b<num_bookings; b++) {
+        for(int s=0; s<num_shows; s++) {
+            if(bookings[b].show_id == shows[s].show_id) {
+                // We only mark seats if the date logic matches (handled in reports)
+                // For local simulation, we mark them generally
             }
         }
     }
-    printf("MSG|Error: ID not found.\n"); fflush(stdout);
 }
 
-void EMSCRIPTEN_KEEPALIVE cancelBooking(char* booking_id) {
-    int found = -1;
-    for (int i = 0; i < num_bookings; i++) if (strcmp(bookings[i].booking_id, booking_id) == 0) found = i;
-    if (found == -1) { printf("MSG|Error: ID not found.\n"); fflush(stdout); return; }
+void loadData() {
+    system("node sync.js pull"); 
+    FILE *f1 = fopen(DATA_PATH "shows_v4.dat", "rb");
+    if (f1) { if (fread(&num_shows, sizeof(int), 1, f1)) fread(shows, sizeof(Show), num_shows, f1); fclose(f1); }
+    FILE *f2 = fopen(DATA_PATH "bookings_v4.dat", "rb");
+    if (f2) { if (fread(&num_bookings, sizeof(int), 1, f2)) fread(bookings, sizeof(Booking), num_bookings, f2); fclose(f2); }
+}
+
+void saveData() {
+    FILE *f1 = fopen(DATA_PATH "shows_v4.dat", "wb");
+    if (f1) { fwrite(&num_shows, sizeof(int), 1, f1); fwrite(shows, sizeof(Show), num_shows, f1); fclose(f1); }
+    FILE *f2 = fopen(DATA_PATH "bookings_v4.dat", "wb");
+    if (f2) { fwrite(&num_bookings, sizeof(int), 1, f2); fwrite(bookings, sizeof(Booking), num_bookings, f2); fclose(f2); }
+}
+
+// --- Features ---
+
+void displayOccupancyReport() {
+    printf("\n" BOLD YEL "DATE-WISE OCCUPANCY REPORT" RESET "\n");
+    printf("--------------------------------------------------------------------------------\n");
+    printf("%-12s | %-15s | %-10s | %-6s | %-6s | %-6s | %-5s\n", "DATE", "MOVIE", "TIME", "TOTAL", "BOOKED", "AVAIL", "LOAD%");
+    printf("--------------------------------------------------------------------------------\n");
+
+    // Strategy: Find every unique (show_id, show_date) pair in bookings
+    typedef struct {
+        int sid;
+        char date[16];
+    } UniqueShowDate;
+    UniqueShowDate pairs[MAX_BOOKINGS];
+    int pair_count = 0;
+
+    for(int b=0; b<num_bookings; b++) {
+        int exists = 0;
+        for(int p=0; p<pair_count; p++) {
+            if(pairs[p].sid == bookings[b].show_id && strcmp(pairs[p].date, bookings[b].show_date) == 0) {
+                exists = 1; break;
+            }
+        }
+        if(!exists) {
+            pairs[pair_count].sid = bookings[b].show_id;
+            strcpy(pairs[pair_count].date, bookings[b].show_date);
+            pair_count++;
+        }
+    }
+
+    // Now display stats for each unique pair
+    for(int p=0; p<pair_count; p++) {
+        int s_idx = -1;
+        for(int s=0; s<num_shows; s++) if(shows[s].show_id == pairs[p].sid) s_idx = s;
+        if(s_idx == -1) continue;
+
+        int booked_seats = 0;
+        for(int b=0; b<num_bookings; b++) {
+            if(bookings[b].show_id == pairs[p].sid && strcmp(bookings[b].show_date, pairs[p].date) == 0) {
+                booked_seats += bookings[b].num_seats;
+            }
+        }
+
+        int total = ROWS * COLS;
+        float perc = ((float)booked_seats / total) * 100.0;
+        printf("%-12s | %-15.15s | %-10s | %-6d | %-6d | %-6d | %.1f%%\n", 
+               pairs[p].date, shows[s_idx].movie_name, shows[s_idx].timing, total, booked_seats, total-booked_seats, perc);
+    }
+
+    // Also list shows with 0 bookings for "Today"
+    time_t t = time(NULL);
+    struct tm *tm = localtime(&t);
+    char today[16]; strftime(today, sizeof(today), "%Y-%m-%d", tm);
+
+    for(int s=0; s<num_shows; s++) {
+        int has_booking = 0;
+        for(int p=0; p<pair_count; p++) if(pairs[p].sid == shows[s].show_id) has_booking = 1;
+        if(!has_booking) {
+            printf("%-12s | %-15.15s | %-10s | %-6d | %-6d | %-6d | 0.0%%\n", 
+                   today, shows[s].movie_name, shows[s].timing, 50, 0, 50);
+        }
+    }
+}
+
+void bookTicket() {
+    int sid; char date[16], name[64];
+    printf("\n" CYN "ENTER BOOKING DETAILS" RESET "\n");
+    printf(" Show ID: "); scanf("%d", &sid);
+    printf(" Date (YYYY-MM-DD): "); scanf("%s", date);
+    printf(" Customer Name: "); scanf("%s", name);
 
     int s_idx = -1;
-    for (int j = 0; j < num_shows; j++) if (shows[j].show_id == bookings[found].show_id) s_idx = j;
-    if (s_idx != -1) {
-        for (int k = 0; k < bookings[found].num_seats; k++) shows[s_idx].seats[bookings[found].seat_rows[k]][bookings[found].seat_cols[k]] = 0;
-    }
-    for (int i = found; i < num_bookings - 1; i++) bookings[i] = bookings[i+1];
-    num_bookings--; saveData();
-    printf("MSG|Success: Booking %s cancelled.\n", booking_id); fflush(stdout);
+    for(int i=0; i<num_shows; i++) if(shows[i].show_id == sid) s_idx = i;
+    if(s_idx == -1) { printf(RED "Invalid Show ID!\n" RESET); return; }
+
+    int count; printf(" Number of Seats: "); scanf("%d", &count);
+    
+    // Check available space
+    int current_booked = 0;
+    for(int b=0; b<num_bookings; b++) 
+        if(bookings[b].show_id == sid && strcmp(bookings[b].show_date, date) == 0) current_booked += bookings[b].num_seats;
+    
+    if(current_booked + count > 50) { printf(RED "Not enough seats available!\n" RESET); return; }
+
+    // Generate Booking
+    if(num_bookings >= MAX_BOOKINGS) return;
+    Booking *nb = &bookings[num_bookings];
+    sprintf(nb->booking_id, "%X", (unsigned int)time(NULL) % 1000000);
+    strcpy(nb->customer_name, name);
+    nb->show_id = sid;
+    nb->num_seats = count;
+    strcpy(nb->show_date, date);
+    strcpy(nb->status, "confirmed");
+    nb->total_amount = shows[s_idx].price * count;
+    
+    num_bookings++;
+    saveData();
+
+    printf("\n" GRN "--- BOOKING SUCCESSFUL ---" RESET "\n");
+    printf(" ID: #%s | Total: ₹%.2f\n", nb->booking_id, nb->total_amount);
 }
 
-void EMSCRIPTEN_KEEPALIVE getOccupancyReport() {
-    for (int i = 0; i < num_shows; i++) {
-        int total = ROWS * COLS, booked = 0;
-        for (int r = 0; r < ROWS; r++) { for (int c = 0; c < COLS; c++) if (shows[i].seats[r][c] == 1) booked++; }
-        printf("REPORT|%d|%s|%s|%d|%d|%d|%.2f\n", shows[i].show_id, shows[i].movie_name, shows[i].timing, total, booked, total - booked, ((float)booked / total) * 100.0f);
-    }
-    fflush(stdout);
-}
-
-void EMSCRIPTEN_KEEPALIVE getTicketQRData(char* booking_id) {
-    for (int i = 0; i < num_bookings; i++) {
-        if (strcmp(bookings[i].booking_id, booking_id) == 0) {
-            printf("QR_DATA|CINEBOOKING-%s-%s\n", bookings[i].booking_id, bookings[i].customer_name);
-            fflush(stdout);
+void viewTicket() {
+    char id[16]; printf("\n Enter Booking ID: "); scanf("%s", id);
+    for(int i=0; i<num_bookings; i++) {
+        if(strcmp(bookings[i].booking_id, id) == 0) {
+            printf("\n" BOLD MAG "RECEIPT FOR #%s" RESET "\n", id);
+            printf(" Customer: %s\n", bookings[i].customer_name);
+            printf(" Date: %s\n", bookings[i].show_date);
+            printf(" Seats: %d\n", bookings[i].num_seats);
+            printf(" Total: ₹%.2f\n", bookings[i].total_amount);
             return;
         }
     }
-    printf("QR_DATA|INVALID\n");
-    fflush(stdout);
-}
-
-// --- Terminal CLI ---
-#ifndef __EMSCRIPTEN__
-void displayMenu() {
-    printf("\n--- VIP CINEBOOKING ADMIN TERMINAL ---\n1. View Shows\n2. Book (Override)\n3. View Ticket\n4. Cancel Booking\n5. Occupancy Report\n6. Exit\nChoice: ");
-}
-
-int authenticateAdmin() {
-    char username[64];
-    char password[64];
-    printf("\n--- CINEBOOKING ADMIN LOGIN ---\n");
-    printf("Username: ");
-    scanf("%s", username);
-    printf("Password: ");
-    scanf("%s", password);
-    
-    if (strcmp(username, "admin") == 0 && strcmp(password, "admin123") == 0) {
-        printf("Login successful. Welcome, Admin.\n");
-        return 1;
-    } else {
-        printf("Access denied.\n");
-        return 0;
-    }
+    printf(RED "Ticket not found.\n" RESET);
 }
 
 int main() {
     loadData();
-    
-    int authAttempts = 0;
-    while (authAttempts < 3) {
-        if (authenticateAdmin()) {
-            break;
-        }
-        authAttempts++;
-    }
-    if (authAttempts >= 3) {
-        printf("Too many failed attempts. Terminating.\n");
-        return 1;
-    }
-
-    int choice, seats, r, c, s_id;
-    char name[64], seat_str[256], b_id[16];
+    int choice;
     while(1) {
-        displayMenu();
-        if (scanf("%d", &choice) != 1) break;
-        if (choice == 6) return 0;
+        printf("\n" BOLD CYN "--- CINEBOOKING TERMINAL ---" RESET "\n");
+        printf(" 1. View Shows\n 2. Book Tickets\n 3. View Receipt\n 4. Occupancy Report\n 0. Exit\n Choice > ");
+        if(scanf("%d", &choice) != 1) break;
+        if(choice == 0) break;
         switch(choice) {
-            case 1: getShows(); break;
-            case 2:
-                printf("Show ID: "); scanf("%d", &s_id);
-                printf("Name: "); scanf("%s", name);
-                printf("Seats: "); scanf("%d", &seats);
-                seat_str[0] = '\0';
-                for(int i=0; i<seats; i++) {
-                    printf("Row Col (0-4 0-9): "); scanf("%d %d", &r, &c);
-                    char tmp[16]; sprintf(tmp, "%d,%d%s", r, c, (i==seats-1)?"":"-");
-                    strcat(seat_str, tmp);
-                }
-                char rand_id[16]; sprintf(rand_id, "%X", rand() % 1000000);
-                bookTickets(s_id, name, seats, seat_str, rand_id);
-                break;
-            case 3: printf("Ticket ID: "); scanf("%s", b_id); viewBooking(b_id); break;
-            case 4: printf("Ticket ID: "); scanf("%s", b_id); cancelBooking(b_id); break;
-            case 5: getOccupancyReport(); break;
-            default: printf("Invalid choice.\n");
+            case 1: for(int i=0; i<num_shows; i++) printf(" [%d] %-15s | %s | ₹%.2f\n", shows[i].show_id, shows[i].movie_name, shows[i].timing, shows[i].price); break;
+            case 2: bookTicket(); break;
+            case 3: viewTicket(); break;
+            case 4: displayOccupancyReport(); break;
         }
     }
     return 0;
 }
-#else
-int main() { return 0; }
-#endif
