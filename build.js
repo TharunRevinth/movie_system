@@ -37,9 +37,9 @@ keys.forEach(k => {
 console.log('Injecting environment variables from template.html into dist/index.html...');
 let html = fs.readFileSync('template.html', 'utf8');
 
-const tmdbKey = process.env.TMDB_API_KEY || 'TMDB_API_KEY_PLACEHOLDER';
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'SUPABASE_URL_PLACEHOLDER';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'SUPABASE_ANON_KEY_PLACEHOLDER';
+const tmdbKey = (process.env.TMDB_API_KEY || 'TMDB_API_KEY_PLACEHOLDER').trim();
+const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || 'SUPABASE_URL_PLACEHOLDER').trim();
+const supabaseAnonKey = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'SUPABASE_ANON_KEY_PLACEHOLDER').trim();
 
 // Log if we are using placeholders
 if (tmdbKey === 'TMDB_API_KEY_PLACEHOLDER') console.warn('WARNING: Using placeholder for TMDB_API_KEY');
