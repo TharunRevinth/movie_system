@@ -451,12 +451,47 @@
         async function doCancelTicket(id) { if(!confirm("Cancel?")) return; try { await window.supabaseClient.from('bookings').delete().eq('id_short', id); showToast("Cancelled", true); document.getElementById('receiptArea').style.display = 'none'; fetchBookingHistory(); } catch(e) { showToast("Failed"); } }
 
         async function refreshOccupancy() { 
-            const b=document.getElementById('occBody'), a=document.getElementById('approvalBody'); b.innerHTML=""; a.innerHTML="";
-            if(window.supabaseClient) {
+            const b=document.getElementById('occBody'), a=document.getElementById('approvalBody'); 
+            if(!b || !a) return;
+            b.innerHTML="<tr><td colspan='5' style='text-align:center; padding:20px;'>Syncing Cloud Data...</td></tr>"; 
+            a.innerHTML="";
+
+            if(window.supabaseClient && window.Module?.ccall) {
                 try {
-                    const { data } = await window.supabaseClient.from('bookings').select('*');
-                    if(data) data.forEach(bk => { if(bk.status === 'pending') a.innerHTML += `<tr><td>#${bk.id_short}</td><td>${bk.customer_name}</td><td>${bk.show_id}</td><td>₹${bk.total_amount}</td><td><button class="btn btn-primary" onclick="verifyPayment('${bk.id_short}')">Verify</button></td></tr>`; });
-                } catch(e) {}
+                    const { data, error } = await window.supabaseClient.from('bookings').select('*');
+                    if(error) throw error;
+                    
+                    // 1. Reset all seats in WASM first
+                    shows.forEach(s => {
+                        for(let r=0; r<5; r++) {
+                            for(let c=0; c<10; c++) {
+                                Module.ccall('markSeat', null, ['number','number','number','number'], [parseInt(s.id), r, c, 0]);
+                            }
+                        }
+                    });
+
+                    // 2. Sync all database bookings into WASM and fill approvals
+                    if(data) {
+                        b.innerHTML = ""; // Clear loading message
+                        let pendingCount = 0;
+                        data.forEach(bk => {
+                            if(bk.seats) {
+                                bk.seats.split('-').forEach(si => {
+                                    const [r, c] = si.split(',').map(Number);
+                                    Module.ccall('markSeat', null, ['number','number','number','number'], [parseInt(bk.show_id), r, c, 1]);
+                                });
+                            }
+                            if(bk.status === 'pending') {
+                                pendingCount++;
+                                a.innerHTML += `<tr><td>#${bk.id_short}</td><td><b>${bk.customer_name}</b></td><td>${bk.show_id}</td><td>₹${bk.total_amount}</td><td><button class="btn btn-primary" style="padding:8px 16px; font-size:0.75rem" onclick="verifyPayment('${bk.id_short}')">Verify</button></td></tr>`;
+                            }
+                        });
+                        if(pendingCount === 0) a.innerHTML = "<tr><td colspan='5' style='text-align:center; color:var(--muted); padding:30px;'>No pending payments</td></tr>";
+                    }
+                } catch(e) {
+                    console.error("Occupancy Sync Error:", e);
+                    showToast("Database Sync Error");
+                }
             }
             if(Module.ccall) Module.ccall('getOccupancyReport', null, [], []); 
         }
