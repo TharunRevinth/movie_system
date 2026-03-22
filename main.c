@@ -11,8 +11,8 @@
 #define EMSCRIPTEN_KEEPALIVE
 #endif
 
-#define MAX_SHOWS 50
-#define MAX_BOOKINGS 200
+#define MAX_SHOWS 200
+#define MAX_BOOKINGS 500
 #define ROWS 5
 #define COLS 10
 
@@ -96,8 +96,9 @@ void EMSCRIPTEN_KEEPALIVE markSeat(int show_id, int r, int c, int state) {
 }
 
 void EMSCRIPTEN_KEEPALIVE saveData() {
+#ifndef __EMSCRIPTEN__
     char path1[128], path2[128];
-    sprintf(path1, "%sshows_v4.dat", DATA_PATH); // Renamed to v3 to avoid corruption
+    sprintf(path1, "%sshows_v4.dat", DATA_PATH); 
     sprintf(path2, "%sbookings_v4.dat", DATA_PATH);
 
     FILE *f1 = fopen(path1, "wb");
@@ -112,26 +113,20 @@ void EMSCRIPTEN_KEEPALIVE saveData() {
         fwrite(bookings, sizeof(Booking), num_bookings, f2);
         fclose(f2);
     }
-
-#ifdef __EMSCRIPTEN__
-    EM_ASM(
-        if (typeof FS !== 'undefined' && FS.syncfs) {
-            FS.syncfs(false, function (err) {});
-        }
-    );
 #endif
 }
 
 void EMSCRIPTEN_KEEPALIVE loadData() {
-    char path1[128], path2[128];
-    sprintf(path1, "%sshows_v4.dat", DATA_PATH);
-    sprintf(path2, "%sbookings_v4.dat", DATA_PATH);
-    
     num_shows = 0;
     num_bookings = 0;
     memset(shows, 0, sizeof(shows));
     memset(bookings, 0, sizeof(bookings));
 
+#ifndef __EMSCRIPTEN__
+    char path1[128], path2[128];
+    sprintf(path1, "%sshows_v4.dat", DATA_PATH);
+    sprintf(path2, "%sbookings_v4.dat", DATA_PATH);
+    
     FILE *f1 = fopen(path1, "rb");
     if (f1) {
         int loaded_num = 0;
@@ -155,6 +150,7 @@ void EMSCRIPTEN_KEEPALIVE loadData() {
         }
         fclose(f2);
     }
+#endif
 }
 
 void EMSCRIPTEN_KEEPALIVE getShows() {
@@ -253,16 +249,48 @@ void EMSCRIPTEN_KEEPALIVE getTicketQRData(char* booking_id) {
 // --- Terminal CLI ---
 #ifndef __EMSCRIPTEN__
 void displayMenu() {
-    printf("\n--- CINEBOOKING ---\n1. View Shows\n2. Book\n3. View Ticket\n4. Cancel\n5. Exit\nChoice: ");
+    printf("\n--- VIP CINEBOOKING ADMIN TERMINAL ---\n1. View Shows\n2. Book (Override)\n3. View Ticket\n4. Cancel Booking\n5. Occupancy Report\n6. Exit\nChoice: ");
 }
+
+int authenticateAdmin() {
+    char username[64];
+    char password[64];
+    printf("\n--- CINEBOOKING ADMIN LOGIN ---\n");
+    printf("Username: ");
+    scanf("%s", username);
+    printf("Password: ");
+    scanf("%s", password);
+    
+    if (strcmp(username, "admin") == 0 && strcmp(password, "admin123") == 0) {
+        printf("Login successful. Welcome, Admin.\n");
+        return 1;
+    } else {
+        printf("Access denied.\n");
+        return 0;
+    }
+}
+
 int main() {
     loadData();
+    
+    int authAttempts = 0;
+    while (authAttempts < 3) {
+        if (authenticateAdmin()) {
+            break;
+        }
+        authAttempts++;
+    }
+    if (authAttempts >= 3) {
+        printf("Too many failed attempts. Terminating.\n");
+        return 1;
+    }
+
     int choice, seats, r, c, s_id;
     char name[64], seat_str[256], b_id[16];
     while(1) {
         displayMenu();
         if (scanf("%d", &choice) != 1) break;
-        if (choice == 5) return 0;
+        if (choice == 6) return 0;
         switch(choice) {
             case 1: getShows(); break;
             case 2:
@@ -271,15 +299,17 @@ int main() {
                 printf("Seats: "); scanf("%d", &seats);
                 seat_str[0] = '\0';
                 for(int i=0; i<seats; i++) {
-                    printf("Row Col: "); scanf("%d %d", &r, &c);
-                    char tmp[16]; sprintf(tmp, "%d,%d%s", r-1, c-1, (i==seats-1)?"":"-");
+                    printf("Row Col (0-4 0-9): "); scanf("%d %d", &r, &c);
+                    char tmp[16]; sprintf(tmp, "%d,%d%s", r, c, (i==seats-1)?"":"-");
                     strcat(seat_str, tmp);
                 }
                 char rand_id[16]; sprintf(rand_id, "%X", rand() % 1000000);
                 bookTickets(s_id, name, seats, seat_str, rand_id);
                 break;
-            case 3: printf("ID: "); scanf("%s", b_id); viewBooking(b_id); break;
-            case 4: printf("ID: "); scanf("%s", b_id); cancelBooking(b_id); break;
+            case 3: printf("Ticket ID: "); scanf("%s", b_id); viewBooking(b_id); break;
+            case 4: printf("Ticket ID: "); scanf("%s", b_id); cancelBooking(b_id); break;
+            case 5: getOccupancyReport(); break;
+            default: printf("Invalid choice.\n");
         }
     }
     return 0;

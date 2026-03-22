@@ -2,829 +2,681 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CineBooking | Cloud Ticket System</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CineBooking | VIP Cinema System</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/uuid/8.3.2/uuid.min.js"></script>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
     <style>
-        :root { --primary: #E50914; --bg: #141414; --surface: #1F1F1F; --text: #FFFFFF; --muted: #B3B3B3; --border: #333333; --green: #46D369; }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); overflow-x: hidden; min-height: 100vh; line-height: 1.5; }
-
-        /* Mobile Optimization */
-        @media (max-width: 768px) {
-            .nav { padding: 0 15px; height: auto; flex-direction: column; gap: 10px; padding-bottom: 10px; position: relative; }
-            .nav-logo { margin-top: 10px; font-size: 1.2rem; }
-            .nav-links { gap: 10px; overflow-x: auto; width: 100%; justify-content: flex-start; padding-bottom: 5px; -webkit-overflow-scrolling: touch; }
-            .nav-item { font-size: 0.8rem; white-space: nowrap; padding: 10px 5px; }
-            .container { padding: 20px 15px; }
-            .header h1 { font-size: 1.6rem; }
-            .card-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 15px; }
-            .movie-info { padding: 12px; }
-            .movie-info h3 { font-size: 1rem; height: 2.4rem; }
-            .seat { width: 22px; height: 22px; }
-            .seat-row { gap: 6px; }
-            .box { padding: 20px; }
-            .modal-inner { padding: 25px; }
-            .id-badge { font-size: 1.5rem; padding: 8px 20px; letter-spacing: 2px; }
-            .receipt-card { padding: 20px; margin: 10px; }
+        :root { 
+            --primary: #FFB800; 
+            --primary-hover: #E6A600;
+            --primary-glow: rgba(255, 184, 0, 0.3);
+            --bg: #080808; 
+            --surface: #121212; 
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --text: #F8FAFC; 
+            --muted: #94A3B8; 
+            --border: #1E293B; 
+            --green: #10B981; 
+            --shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+            --container-padding: clamp(1rem, 5vw, 4rem);
+            
+            /* Theme Graphics */
+            --screen-color: #ffffff;
+            --screen-glow: rgba(255, 255, 255, 0.4);
+            --seat-base: #222;
+            --seat-booked: #080808;
+            --input-bg: #000;
+            --nav-bg: rgba(8, 8, 8, 0.9);
+            --hero-grad: linear-gradient(to top, #080808 0%, rgba(8,8,8,0.7) 40%, rgba(8,8,8,0) 100%);
         }
 
-        @media print {
-            body { background: white !important; }
-            nav, .container, #toast, #confirm-modal, .no-print { display: none !important; }
-            #receiptArea { display: block !important; width: 100%; margin: 0; padding: 0; }
-            .receipt-card { box-shadow: none !important; border: 2px solid #000 !important; margin: 20px auto; width: 100% !important; max-width: 500px; padding: 40px !important; border-radius: 0 !important; color: black !important; }
-            .receipt-card * { color: black !important; }
-            .btn, .no-print { display: none !important; }
+        @media (prefers-color-scheme: light) {
+            :root {
+                --bg: #F8FAFC;
+                --surface: #FFFFFF;
+                --text: #0F172A;
+                --muted: #64748B;
+                --border: #E2E8F0;
+                --glass: rgba(0, 0, 0, 0.02);
+                --glass-border: rgba(0, 0, 0, 0.08);
+                --shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+                
+                --screen-color: #94A3B8;
+                --screen-glow: rgba(15, 23, 42, 0.1);
+                --seat-base: #E2E8F0;
+                --seat-booked: #94A3B8;
+                --input-bg: #FFFFFF;
+                --nav-bg: rgba(255, 255, 255, 0.95);
+                --hero-grad: linear-gradient(to top, #F8FAFC 0%, rgba(248, 250, 252, 0.8) 40%, rgba(248, 250, 252, 0) 100%);
+            }
+            .seat.booked { opacity: 0.2; }
+            .nav-links { background: #F1F5F9 !important; }
+            .nav-item:hover { background: #E2E8F0 !important; }
+            .hero { background: #F1F5F9 !important; }
+            .hero-content h1 { text-shadow: none !important; }
         }
 
-        .nav { height: 70px; background: #000000; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 60px; position: sticky; top: 0; z-index: 1000; }
-        .nav-logo { font-weight: 800; font-size: 1.4rem; letter-spacing: -0.5px; }
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; transition: background-color 0.2s, border-color 0.2s, box-shadow 0.2s; }
+        
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background: var(--bg); 
+            color: var(--text); 
+            overflow-x: hidden; 
+            min-height: 100vh; 
+            line-height: 1.6;
+            background-image: radial-gradient(circle at 10% 10%, var(--primary-glow) 0%, transparent 40%);
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg); }
+        ::-webkit-scrollbar-thumb { background: var(--muted); border-radius: 10px; }
+
+        .nav { 
+            height: clamp(60px, 10vh, 80px); 
+            background: var(--nav-bg); 
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--glass-border); 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between; 
+            padding: 0 var(--container-padding); 
+            position: sticky; 
+            top: 0; 
+            z-index: 1000; 
+        }
+        .nav-logo { font-weight: 800; font-size: clamp(1rem, 2.5vw, 1.5rem); letter-spacing: -1px; display: flex; align-items: center; gap: 10px; color: var(--text); flex-shrink: 0; cursor: pointer; }
         .nav-logo span { color: var(--primary); }
-        .nav-links { display: flex; gap: 32px; height: 100%; }
-        .nav-item { font-size: 0.95rem; font-weight: 600; color: var(--muted); cursor: pointer; border-bottom: 3px solid transparent; display: flex; align-items: center; padding: 0 10px; transition: all 0.2s; }
-        .nav-item.active { color: var(--text); border-bottom-color: var(--primary); }
+        .nav-logo::before { content: ''; width: 6px; height: 20px; background: var(--primary); border-radius: 2px; }
         
-        .container { max-width: 1200px; margin: 0 auto; padding: 48px 60px; }
-        .header { margin-bottom: 40px; }
-        .header h1 { font-size: 2.2rem; font-weight: 800; }
+        .nav-links-wrapper { display: flex; align-items: center; gap: 0.5rem; overflow-x: auto; -ms-overflow-style: none; scrollbar-width: none; flex-grow: 1; justify-content: flex-end; }
+        .nav-links { display: flex; gap: 4px; background: var(--glass); padding: 4px; border-radius: 12px; border: 1px solid var(--glass-border); flex-shrink: 0; }
+        .nav-item { font-size: clamp(0.65rem, 1.2vw, 0.8rem); font-weight: 700; color: var(--muted); cursor: pointer; padding: 6px 12px; border-radius: 10px; transition: all 0.2s ease; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
+        .nav-item:hover { color: var(--text); background: var(--glass); }
+        .nav-item.active { color: #000; background: var(--primary); box-shadow: 0 4px 15px var(--primary-glow); }
+        .nav-item.auth-btn { background: transparent; border: 1px solid var(--primary); color: var(--primary); margin-left: 8px; }
+        
+        .hero { min-height: clamp(300px, 60vh, 600px); position: relative; overflow: hidden; display: flex; align-items: flex-end; padding: var(--container-padding); background: #000; }
+        .hero-bg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; background-position: center 20%; z-index: 0; opacity: 0; transition: opacity 1s ease, transform 2s ease; }
+        .hero-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: var(--hero-grad); z-index: 1; }
+        .hero-content { position: relative; z-index: 2; max-width: 800px; width: 100%; opacity: 0; transform: translateY(20px); transition: 0.8s ease forwards; }
+        .hero-content.show { opacity: 1; transform: translateY(0); }
+        .hero-content h1 { font-size: clamp(1.8rem, 7vw, 4.5rem); font-weight: 900; line-height: 1.1; margin-bottom: 15px; letter-spacing: -2px; color: var(--text); text-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .hero-content p { color: var(--muted); font-size: clamp(0.85rem, 2vw, 1.1rem); margin-bottom: 25px; max-width: 500px; font-weight: 500; }
+        
+        .container { max-width: 1400px; margin: 0 auto; padding: var(--container-padding); width: 100%; }
+        .header { margin-bottom: clamp(20px, 5vh, 40px); }
+        .header h2 { font-size: clamp(1.3rem, 4vw, 2.2rem); font-weight: 800; letter-spacing: -1px; color: var(--text); }
+        
         .tab-content { display: none; }
-        .tab-content.active { display: block; animation: fadeIn 0.3s; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .tab-content.active { display: block; animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         
-        .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 32px; padding-bottom: 40px; }
-        .movie-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; height: 100%; transition: transform 0.3s, border-color 0.3s, box-shadow 0.3s; position: relative; }
-        .movie-card:hover { transform: translateY(-10px); border-color: var(--primary); box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.6); }
-        .movie-poster-wrap { width: 100%; aspect-ratio: 2/3; background: #1a1a1a; overflow: hidden; position: relative; display: flex; align-items: center; justify-content: center; text-align: center; color: var(--muted); padding: 20px; font-weight: 700; font-size: 0.9rem; }
-        .movie-poster { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.5s; position: absolute; top: 0; left: 0; z-index: 1; }
-        .movie-card:hover .movie-poster { transform: scale(1.05); }
-        .movie-info { padding: 20px; display: flex; flex-direction: column; flex-grow: 1; gap: 12px; }
-        .movie-info h3 { font-size: 1.2rem; font-weight: 800; color: white; line-height: 1.2; margin: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; height: 2.8rem; }
-        .movie-info p { color: var(--muted); font-size: 0.85rem; font-weight: 600; margin: 0; }
+        .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(clamp(140px, 22vw, 220px), 1fr)); gap: clamp(0.8rem, 3vw, 30px); }
+        .movie-card { background: var(--surface); border: 1px solid var(--glass-border); border-radius: 16px; overflow: hidden; transition: 0.3s ease; cursor: pointer; display: flex; flex-direction: column; height: 100%; }
+        .movie-card:hover { transform: translateY(-8px); border-color: var(--primary); box-shadow: var(--shadow); }
+        .movie-poster-wrap { width: 100%; aspect-ratio: 2/3; position: relative; overflow: hidden; background: #1a1a1a; }
+        .movie-poster { width: 100%; height: 100%; object-fit: cover; }
+        .movie-info { padding: 12px; flex-grow: 1; }
+        .movie-info h3 { font-size: 0.95rem; font-weight: 700; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+        .movie-info p { color: var(--muted); font-size: 0.85rem; }
         
-        .price-tag { font-size: 1.2rem; font-weight: 900; color: var(--text); }
-        .price-tag span { color: var(--primary); font-size: 0.9rem; margin-right: 2px; }
-        
-        .btn { padding: 12px 24px; border-radius: 8px; font-weight: 700; font-size: 0.9rem; cursor: pointer; border: none; transition: 0.2s; text-align: center; outline: none; }
-        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .btn-primary { background: var(--primary); color: white; }
-        .btn-primary:hover:not(:disabled) { background: #ff0f1a; }
-        .btn-outline { background: transparent; color: white; border: 1px solid var(--border); }
-        .btn-outline:hover:not(:disabled) { background: rgba(255,255,255,0.05); border-color: var(--muted); }
-        .btn-danger { background: #E50914; color: white; }
-        
-        .box { background: var(--surface); border-radius: 12px; border: 1px solid var(--border); padding: 32px; }
-        input, select { width: 100%; padding: 14px; background: #141414; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem; color: white; outline: none; margin-bottom: 15px; transition: border-color 0.2s; }
+        #book-layout { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 350px), 1fr)); gap: clamp(1.5rem, 5vw, 40px); align-items: start; }
+        .box { background: var(--surface); border-radius: 20px; border: 1px solid var(--glass-border); padding: clamp(15px, 4vw, 40px); box-shadow: var(--shadow); width: 100%; }
+        .form-group { margin-bottom: 20px; text-align: left; }
+        .form-group label { display: block; font-size: 0.7rem; font-weight: 800; color: var(--muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+        input, select { width: 100%; padding: 14px; background: var(--input-bg); border: 1px solid var(--glass-border); border-radius: 12px; font-size: 0.95rem; color: var(--text); outline: none; transition: border-color 0.2s; }
         input:focus, select:focus { border-color: var(--primary); }
         
-        .screen { height: 40px; background: linear-gradient(to bottom, #444, transparent); margin: 0 auto 40px; border-top-left-radius: 50%; border-top-right-radius: 50%; text-align: center; color: var(--muted); font-size: 0.8rem; line-height: 20px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; }
-        .seats-container { display: flex; flex-direction: column; gap: 10px; align-items: center; padding: 20px; background: rgba(0,0,0,0.2); border-radius: 12px; }
-        .seat-row { display: flex; gap: 10px; }
-        .seat { width: 30px; height: 30px; background: #333; border-radius: 6px; cursor: pointer; transition: 0.2s; position: relative; }
-        .seat:hover:not(.booked) { background: #444; transform: scale(1.1); }
-        .seat.selected { background: var(--green); transform: scale(1.1); box-shadow: 0 0 15px rgba(70, 211, 105, 0.4); }
-        .seat.booked { background: var(--primary); cursor: not-allowed; opacity: 0.5; }
-        .seat.booked:hover { opacity: 1; }
+        .screen-container { perspective: 800px; margin-bottom: clamp(20px, 6vh, 60px); width: 100%; text-align: center; }
+        .screen-visual { height: 8px; width: 100%; background: var(--screen-color); border-radius: 50%; transform: rotateX(-45deg); box-shadow: 0 15px 40px var(--screen-glow); margin-bottom: 15px; }
+        .screen-label { color: var(--muted); font-size: 0.6rem; text-transform: uppercase; letter-spacing: 6px; font-weight: 800; }
         
-        /* Seat Label on Hover */
-        .seat::after {
-            content: attr(data-label);
-            position: absolute;
-            top: -30px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0,0,0,0.9);
-            color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 11px;
-            font-weight: 700;
-            white-space: nowrap;
-            display: none;
-            z-index: 100;
-            border: 1px solid var(--border);
-            pointer-events: none;
+        .seats-wrapper { width: 100%; overflow-x: auto; padding: 10px 0; -webkit-overflow-scrolling: touch; display: flex; justify-content: center; }
+        .seats-container { display: flex; flex-direction: column; gap: clamp(4px, 1.5vw, 10px); align-items: center; min-width: 320px; }
+        .seat-row { display: flex; gap: clamp(4px, 1.5vw, 8px); }
+        .seat { width: clamp(20px, 4.5vw, 30px); height: clamp(18px, 4vw, 26px); background: var(--seat-base); border-radius: 4px 4px 2px 2px; cursor: pointer; border-bottom: 3px solid rgba(0,0,0,0.2); transition: 0.2s; }
+        .seat:hover:not(.booked) { background: #444; }
+        .seat.selected { background: var(--primary); border-color: var(--primary-hover); transform: scale(1.1); }
+        .seat.booked { background: var(--seat-booked); cursor: not-allowed; }
+        
+        .legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; margin-top: 25px; padding-top: 15px; border-top: 1px solid var(--glass-border); }
+        .legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.7rem; color: var(--muted); font-weight: 700; text-transform: uppercase; }
+        .legend-box { width: 12px; height: 12px; border-radius: 3px; }
+
+        .history-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(clamp(260px, 45vw, 400px), 1fr)); gap: 15px; margin-top: 30px; }
+        .history-card { background: var(--surface); border: 1px solid var(--glass-border); border-radius: 16px; padding: 16px; transition: 0.2s; cursor: pointer; text-align: left; }
+        .history-card:hover { transform: scale(1.02); border-color: var(--primary); box-shadow: var(--shadow); }
+        .history-card h4 { color: var(--text); margin-bottom: 6px; font-size: 1rem; }
+        
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); backdrop-filter: blur(10px); z-index: 3000; padding: 15px; justify-content: center; align-items: center; }
+        .modal-inner { background: var(--surface); padding: clamp(20px, 5vw, 40px); border-radius: 24px; text-align: center; border: 1px solid var(--glass-border); max-width: 450px; width: 100%; max-height: 90vh; overflow-y: auto; box-shadow: 0 30px 60px rgba(0,0,0,0.8); color: var(--text); }
+        
+        .btn { padding: 14px 24px; border-radius: 12px; font-weight: 800; font-size: 0.85rem; cursor: pointer; border: none; transition: 0.2s ease; display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-transform: uppercase; letter-spacing: 1px; }
+        .btn-primary { background: var(--primary); color: #000; width: 100%; }
+        .btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 10px 20px var(--primary-glow); background: #fff; }
+        .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--glass-border); }
+        .btn-outline:hover:not(:disabled) { background: var(--text); color: var(--bg); }
+
+        #toast { visibility: hidden; min-width: 250px; background: var(--text); color: var(--bg); border-radius: 12px; padding: 14px 20px; position: fixed; z-index: 5000; right: 20px; bottom: 20px; font-weight: 800; font-size: 0.8rem; box-shadow: 0 20px 40px rgba(0,0,0,0.4); display: flex; align-items: center; gap: 10px; }
+        #toast.show { visibility: visible; animation: slideUp 0.4s ease forwards; }
+        @keyframes slideUp { from { transform: translateY(100px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+        .auth-tabs { display: flex; margin-bottom: 25px; border-bottom: 2px solid var(--glass-border); }
+        .auth-tab { flex: 1; padding: 12px; cursor: pointer; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; font-size: 0.8rem; border-bottom: 2px solid transparent; }
+        .auth-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+        .admin-only { display: none; }
+        
+        .receipt-card { background: #fff !important; color: #000 !important; border-radius: 24px; margin: 0 auto; max-width: 420px; overflow: hidden; box-shadow: 0 50px 100px rgba(0,0,0,0.8); width: 100%; }
+        .receipt-card * { color: #000 !important; }
+        .receipt-top { background: #000; padding: 30px; color: #fff !important; text-align: center; }
+        .receipt-top * { color: #fff !important; }
+        .receipt-body { padding: 20px; }
+        .receipt-row { display: flex; justify-content: space-between; margin-bottom: 10px; border-bottom: 1px dashed #eee; padding-bottom: 6px; font-size: 0.85rem; }
+        .receipt-row span { color: #888 !important; font-weight: 700; text-transform: uppercase; font-size: 0.7rem; }
+        
+        .table-wrapper { width: 100%; overflow-x: auto; margin-top: 15px; border-radius: 16px; border: 1px solid var(--glass-border); }
+        table { width: 100%; border-collapse: collapse; min-width: 500px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid var(--glass-border); font-size: 0.85rem; }
+        th { background: var(--glass); color: var(--muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; }
+        
+        @media print {
+            .no-print, nav, .hero, .container, #toast, .modal, .btn { display: none !important; }
+            body { background: #fff !important; color: #000 !important; margin: 0; padding: 0; }
+            #receiptArea { display: block !important; position: absolute; top: 0; left: 0; width: 100%; margin: 0; padding: 20px; visibility: visible !important; }
+            .receipt-card { box-shadow: none !important; border: 1px solid #eee !important; width: 100% !important; max-width: 100% !important; margin: 0 !important; }
+            .receipt-top { background: #000 !important; -webkit-print-color-adjust: exact; }
         }
-        .seat:hover::after { display: block; }
-        .seat.booked:hover::after { background: var(--primary); border-color: #ff4d4d; }
-        .seat.selected:hover::after { background: var(--green); color: black; border-color: white; }
-        
-        .receipt-card { background: white !important; color: black !important; padding: 40px; border-radius: 12px; margin: 0 auto; max-width: 500px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        .receipt-card * { color: black !important; }
-        .receipt-header { text-align: center; border-bottom: 2px dashed #ccc; padding-bottom: 20px; margin-bottom: 20px; }
-        .receipt-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 1rem; }
-        
-        #toast { visibility: hidden; min-width: 300px; background-color: #FFFFFF; color: #141414; text-align: center; border-radius: 12px; padding: 20px; position: fixed; z-index: 2000; right: 30px; bottom: 30px; font-size: 1rem; font-weight: 700; box-shadow: 0 15px 35px rgba(0,0,0,0.4); border-bottom: 5px solid var(--primary); }
-        #toast.show { visibility: visible; animation: fadein 0.5s, fadeout 0.5s 2.5s; }
-        @keyframes fadein { from { bottom: 0; opacity: 0; } to { bottom: 30px; opacity: 1; } }
-        @keyframes fadeout { from { bottom: 30px; opacity: 1; } to { bottom: 0; opacity: 0; } }
-        
-        #confirm-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 3000; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
-        .modal-inner { background: var(--surface); padding: 50px; border-radius: 24px; text-align: center; border: 1px solid var(--border); max-width: 500px; width: 90%; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
-        .id-badge { background: var(--green); color: black; font-size: 2.2rem; font-weight: 900; padding: 12px 40px; border-radius: 12px; display: inline-block; margin: 24px 0; letter-spacing: 4px; font-family: monospace; }
-        
-        table { width: 100%; border-collapse: collapse; }
-        th { text-align: left; padding: 16px; font-size: 0.85rem; color: var(--muted); text-transform: uppercase; border-bottom: 1px solid var(--border); letter-spacing: 1px; }
-        td { padding: 16px; font-size: 0.95rem; border-bottom: 1px solid var(--border); }
     </style>
 </head>
 <body>
     <nav class="nav no-print">
-        <div class="nav-logo">Cine<span>Booking</span></div>
-        <div class="nav-links">
-            <div class="nav-item active" onclick="switchTab('movies')">Now Showing</div>
-            <div class="nav-item" onclick="switchTab('book')">Book Tickets</div>
-            <div class="nav-item" onclick="switchTab('scanner')">Scan QR</div>
-            <div class="nav-item" onclick="switchTab('receipt')">Find Ticket</div>
-            <div class="nav-item" onclick="switchTab('occupancy')">Occupancy</div>
+        <div class="nav-logo" onclick="switchTab('movies')">CINE<span>BOOKING</span></div>
+        <div class="nav-links-wrapper">
+            <div class="nav-links">
+                <div class="nav-item active" onclick="switchTab('movies')">Home</div>
+                <div class="nav-item" onclick="switchTab('book')">Book</div>
+                <div class="nav-item" onclick="switchTab('scanner')">Scan</div>
+                <div class="nav-item" onclick="switchTab('receipt')">Tickets</div>
+                <div id="adminTabBtn" class="nav-item admin-only" onclick="switchTab('occupancy')">Admin</div>
+            </div>
+            <div id="userStateBtn" class="nav-item auth-btn" onclick="toggleAuthModal()">Log In</div>
         </div>
     </nav>
 
+    <div id="heroSection" class="hero no-print">
+        <div id="heroBg" class="hero-bg"></div>
+        <div class="hero-overlay"></div>
+        <div class="hero-content" id="heroContent">
+            <h1 id="heroTitle">VIP Cinema Experience</h1>
+            <p id="heroDesc">Select a movie from our premium collection below to begin your journey.</p>
+            <div style="display:flex; flex-wrap: wrap; gap:12px;">
+                <button class="btn btn-primary" style="width: auto" onclick="switchTab('book')">Book Now</button>
+                <button class="btn btn-outline" onclick="window.scrollTo({top: document.getElementById('movies').offsetTop - 100, behavior:'smooth'})">Explore</button>
+            </div>
+        </div>
+    </div>
+
     <div class="container no-print">
         <div id="movies" class="tab-content active">
-            <div class="header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:20px">
-                <h1>Now Showing</h1>
-                <div style="display:flex; gap:10px; align-items:center">
-                    <span style="color:var(--muted); font-size:0.9rem">Region:</span>
-                    <select id="webLoc" onchange="fetchMovies()" style="width:180px; margin-bottom:0">
-                        <option value="india">All India</option>
-                        <option value="hindi">Bollywood</option>
-                        <option value="tamil">Kollywood</option>
-                        <option value="telugu">Tollywood</option>
-                        <option value="malayalam">Mollywood</option>
-                    </select>
-                </div>
+            <div class="header" style="display:flex; flex-wrap: wrap; justify-content:space-between; align-items:center; gap: 15px;">
+                <h2>Now Showing</h2>
+                <select id="webLoc" onchange="fetchMovies()" style="width: auto; min-width: 140px; padding: 8px 12px;">
+                    <option value="india">All Regions</option>
+                    <option value="hindi">Bollywood</option>
+                    <option value="tamil">Kollywood</option>
+                    <option value="telugu">Tollywood</option>
+                    <option value="malayalam">Mollywood</option>
+                </select>
             </div>
             <div class="card-grid" id="movieGrid"></div>
         </div>
 
         <div id="book" class="tab-content">
-            <div class="header"><h1>Book Tickets</h1></div>
-            <div style="display: flex; gap: 40px; flex-wrap: wrap;">
-                <div class="box" style="flex: 1; min-width: 300px;">
-                    <div class="form-group"><label>Select Movie</label><select id="bMovie" onchange="fetchSeats()"></select></div>
-                    <div class="form-group"><label>Customer Name</label><input type="text" id="bName" placeholder="Enter name"></div>
-                    <div id="selectedSeatsInfo" style="margin-bottom: 20px; font-weight: 600; color: var(--green); min-height: 24px; font-size: 0.9rem;"></div>
-                    <button id="bookBtn" class="btn btn-primary" style="width:100%" onclick="processBooking()">Confirm Booking</button>
+            <div class="header"><h2>Reservation</h2></div>
+            <div id="book-layout">
+                <div class="box">
+                    <div class="form-group"><label>Movie</label><select id="bMovie" onchange="updateTimingOptions()"></select></div>
+                    <div id="timingContainer" class="form-group" style="display: none;">
+                        <label>Showtime</label>
+                        <select id="bTiming" onchange="fetchSeats()"></select>
+                    </div>
+                    <div class="form-group"><label>Your Name</label><input type="text" id="bName" placeholder="Full name"></div>
+                    <div id="selectedSeatsInfo" style="margin-bottom: 15px; font-weight: 800; color: var(--primary); font-size: 0.75rem; min-height: 18px;"></div>
+                    <button id="bookBtn" class="btn btn-primary" onclick="initiatePayment()">Proceed to Checkout</button>
                 </div>
-                <div class="box" style="flex: 2; min-width: 350px;"><div class="screen">Screen</div><div id="seatGrid" class="seats-container"></div></div>
+                <div class="box">
+                    <div class="screen-container">
+                        <div class="screen-visual"></div>
+                        <div class="screen-label">Screen</div>
+                    </div>
+                    <div class="seats-wrapper">
+                        <div id="seatGrid" class="seats-container"></div>
+                    </div>
+                    <div class="legend">
+                        <div class="legend-item"><div class="legend-box" style="background: var(--seat-base);"></div> Available</div>
+                        <div class="legend-item"><div class="legend-box" style="background: var(--primary);"></div> Choice</div>
+                        <div class="legend-item"><div class="legend-box" style="background: var(--seat-booked);"></div> Booked</div>
+                    </div>
+                </div>
             </div>
         </div>
         
         <div id="scanner" class="tab-content">
-            <div class="header"><h1>Ticket Scanner</h1></div>
-            <div class="box" style="max-width: 500px; margin: 0 auto; text-align: center;">
-                <p style="color: var(--muted); margin-bottom: 20px;">Point your camera at the ticket QR code to instantly verify entry.</p>
-                <button class="btn btn-primary" id="scanCtrlBtn" style="width:100%" onclick="toggleScanner()">Start Scanning</button>
-                <div id="reader" style="width: 100%; margin-top: 20px; display: none; border-radius: 12px; overflow: hidden; border: 1px solid var(--border);"></div>
+            <div class="box" style="max-width: 600px; margin: 0 auto; text-align: center;">
+                <h2 style="margin-bottom: 15px;">Digital Admission Scanner</h2>
+                <p style="color: var(--muted); margin-bottom: 30px;">Verify entry by scanning the ticket QR code.</p>
+                <button class="btn btn-primary" id="scanCtrlBtn" onclick="toggleScanner()">Open Camera</button>
+                <div id="reader" style="width: 100%; margin-top: 25px; display: none; border-radius: 20px; overflow: hidden; border: 4px solid var(--primary);"></div>
             </div>
         </div>
 
         <div id="receipt" class="tab-content">
-            <div class="header"><h1>Find Ticket</h1></div>
+            <div class="header" style="display:flex; flex-wrap: wrap; justify-content:space-between; align-items:center; gap: 15px;">
+                <h2>My Admission</h2>
+                <button class="btn btn-outline" style="padding: 8px 16px;" onclick="fetchBookingHistory()">Refresh</button>
+            </div>
+            
             <div class="box" style="max-width: 500px; margin: 0 auto; text-align: center;">
-                <div class="form-group"><input type="text" id="vBookingId" placeholder="Enter 6-Digit ID"></div>
-                <button class="btn btn-primary" style="width:100%" onclick="fetchReceipt()">Search Ticket</button>
+                <div class="form-group"><input type="text" id="vBookingId" placeholder="Booking ID" style="text-align: center; font-weight: 900; text-transform: uppercase; letter-spacing: 4px;"></div>
+                <button class="btn btn-primary" onclick="fetchReceipt()">Retrieve Ticket</button>
+            </div>
+
+            <div id="historySection" style="margin-top: 40px;">
+                <h3 style="text-transform: uppercase; letter-spacing: 2px; font-size: 0.7rem; color: var(--muted); border-bottom: 1px solid var(--glass-border); padding-bottom: 8px; margin-bottom: 15px;">Cloud History</h3>
+                <div id="historyGrid" class="history-grid"></div>
             </div>
         </div>
 
         <div id="occupancy" class="tab-content">
-            <div class="header" style="display:flex; justify-content:space-between; align-items:center;">
-                <h1>Occupancy Report</h1>
-                <div style="display:flex; gap:10px">
-                    <button class="btn btn-outline" onclick="syncFromCloud()">🔄 Sync Cloud</button>
-                </div>
+            <div class="header">
+                <h2>Admin Console</h2>
+                <button class="btn btn-outline" style="padding: 8px 16px;" onclick="refreshOccupancy()">Refresh All</button>
             </div>
-            <div class="box"><table><thead><tr><th>ID</th><th>Movie</th><th>Timing</th><th>Occupancy</th><th>Rate</th></tr></thead><tbody id="occBody"></tbody></table></div>
+            
+            <div class="box" style="margin-top: 25px;">
+                <h3 style="margin-bottom: 15px; font-size: 1rem;">Payment Approvals</h3>
+                <div class="table-wrapper"><table id="approvalTable"><thead><tr><th>Ref</th><th>Guest</th><th>Show ID</th><th>Amount</th><th>Action</th></tr></thead><tbody id="approvalBody"><tr><td colspan="5" style="text-align: center; color: var(--muted); padding: 30px;">No pending payments</td></tr></tbody></table></div>
+            </div>
+
+            <div class="box" style="margin-top: 25px;">
+                <h3 style="margin-bottom: 15px; font-size: 1rem;">Show Occupancy</h3>
+                <div class="table-wrapper"><table id="occTable"><thead><tr><th>ID</th><th>Movie</th><th>Timing</th><th>Load</th><th>Status</th></tr></thead><tbody id="occBody"></tbody></table></div>
+            </div>
         </div>
     </div>
 
     <div id="receiptArea" class="container" style="display: none;"></div>
 
-    <div id="confirm-modal">
-        <div class="modal-inner">
-            <h1 style="color: var(--green)">Booking Confirmed!</h1>
-            <p style="color: var(--muted); margin-top: 10px;">Your Ticket ID is:</p>
-            <div class="id-badge" id="resId">---</div>
-            <p style="margin-bottom: 30px;">Keep this ID to view or cancel your ticket.</p>
-            <button class="btn btn-primary" onclick="closeModal()">Done</button>
+    <div id="confirm-modal" class="modal"><div class="modal-inner">
+        <h2 style="color: white; margin-bottom: 10px;">Request Submitted!</h2>
+        <p style="color: var(--muted);">Your Reference ID is:</p>
+        <div class="id-badge" id="resId" style="font-size: 1.8rem; font-weight: 900; color: var(--primary); margin: 15px 0; padding: 10px; background: rgba(255,184,0,0.1); border-radius: 12px;">---</div>
+        <p style="color: var(--muted); margin-bottom: 25px; font-size: 0.8rem;">Please wait for Admin to verify your payment. You can check your status in the Tickets tab.</p>
+        <button class="btn btn-primary" onclick="closeConfirmModal()">Got It</button>
+    </div></div>
+
+    <div id="auth-modal" class="modal"><div class="modal-inner" style="padding: 25px;">
+        <div class="auth-tabs"><div class="auth-tab active" id="tab-login" onclick="setAuthMode('login')">Log In</div><div class="auth-tab" id="tab-register" onclick="setAuthMode('register')">Register</div></div>
+        <div class="form-group"><label>Email</label><input type="email" id="authEmail"></div>
+        <div class="form-group"><label>Password</label><input type="password" id="authPass"></div>
+        <button class="btn btn-primary" id="authSubmitBtn" onclick="processAuth()">Authenticate</button>
+        <button class="btn btn-outline" style="width: 100%; border: none; margin-top: 10px;" onclick="document.getElementById('auth-modal').style.display='none'">Close</button>
+    </div></div>
+
+    <div id="payment-modal" class="modal"><div class="modal-inner">
+        <h2 style="color: white; margin-bottom: 5px;">Secure Payment</h2>
+        <p style="color: var(--muted); margin-bottom: 15px; font-size: 0.75rem;">Scan the QR to make your payment.</p>
+        <div class="payment-card" style="text-align: center;">
+            <div style="color: var(--primary); font-size: 1.8rem; font-weight: 900; margin-bottom: 15px;" id="payAmount">₹0.00</div>
+            <div id="payQr" style="padding: 8px; background: white; border-radius: 12px; display: inline-block;"></div>
         </div>
-    </div>
+        <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
+            <button class="btn btn-primary" id="payConfirmBtn" onclick="processBooking()">Submit for Verification</button>
+            <button class="btn btn-outline" style="border:none" onclick="document.getElementById('payment-modal').style.display='none'">Cancel</button>
+        </div>
+    </div></div>
+
     <div id="toast">Message</div>
 
     <script type='text/javascript'>
-        var shows = [], selectedSeats = [], currentSeats = [], env = {};
+        var shows = [], selectedSeats = [], currentSeats = [], env = {}, currentUser = null, authMode = 'login', html5QrCode = null;
         window.supabaseClient = null;
-        let tmdbKey = "";
 
-        function showToast(m, s=false) { const t=document.getElementById("toast"); if(!t)return; t.innerText=m; t.style.borderBottomColor=s?"var(--green)":"var(--primary)"; t.className="show"; setTimeout(()=>t.className="", 3000); }
-        function closeModal() { document.getElementById('confirm-modal').style.display = 'none'; switchTab('movies'); }
+        function showToast(m, s=false) { const t=document.getElementById("toast"); if(!t)return; t.innerHTML=`<div style="width:10px; height:10px; background:${s?'var(--green)':'var(--primary)'}; border-radius:50%"></div> ${m}`; t.className="show"; setTimeout(()=>t.className="", 3000); }
+        function closeConfirmModal() { document.getElementById('confirm-modal').style.display = 'none'; switchTab('movies'); }
         
         async function switchTab(tabId) { 
             document.querySelectorAll('.tab-content').forEach(el=>el.classList.remove('active')); 
             document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active')); 
-            
-            // Stop scanner if leaving scanner tab
             if (tabId !== 'scanner') await stopScanner();
-            
-            const receiptArea = document.getElementById('receiptArea');
-            if (receiptArea) receiptArea.style.display = 'none';
-            const target = document.getElementById(tabId);
-            if (target) target.classList.add('active'); 
-            const navLinks = document.querySelectorAll('.nav-item');
-            if (tabId === 'movies' && navLinks[0]) navLinks[0].classList.add('active');
-            else if (tabId === 'book' && navLinks[1]) navLinks[1].classList.add('active');
-            else if (tabId === 'scanner' && navLinks[2]) navLinks[2].classList.add('active');
-            else if (tabId === 'receipt' && navLinks[3]) navLinks[3].classList.add('active');
-            else if (tabId === 'occupancy' && navLinks[4]) navLinks[4].classList.add('active');
-            
+            document.getElementById('receiptArea').style.display = 'none';
+            document.getElementById('heroSection').style.display = (tabId === 'movies') ? 'flex' : 'none';
+            const target = document.getElementById(tabId); if (target) target.classList.add('active'); 
+            const items = document.querySelectorAll('.nav-links .nav-item');
+            const map = { 'movies': 0, 'book': 1, 'scanner': 2, 'receipt': 3 };
+            if(map[tabId] !== undefined && items[map[tabId]]) items[map[tabId]].classList.add('active');
+            if(tabId === 'occupancy' && document.getElementById('adminTabBtn')) document.getElementById('adminTabBtn').classList.add('active');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
             if(tabId === 'movies') refreshShows();
             else if(tabId === 'book') populateBookDropdown();
+            else if(tabId === 'receipt') fetchBookingHistory();
             else if(tabId === 'occupancy') refreshOccupancy();
         }
         
         async function loadEnv() {
-            // Values hardcoded for deployment
-            const githubEnv = {
-                'TMDB_API_KEY': 'edbc00baf95ec5489ebeee2c2b89431d',
-                'NEXT_PUBLIC_SUPABASE_URL': 'https://xwzbcexvpvtprytqaggx.supabase.co',
-                'NEXT_PUBLIC_SUPABASE_ANON_KEY': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh3emJjZXh2cHZ0cHJ5dHFhZ2d4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwNjc3OTMsImV4cCI6MjA4ODY0Mzc5M30.4BhB86darviKf9r9xpMH937VxYUqxVFDNZS8jE7iEs8'
-            };
-
-            const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-
+            const githubEnv = { 'TMDB_API_KEY': 'TMDB_API_KEY_PLACEHOLDER', 'NEXT_PUBLIC_SUPABASE_URL': 'SUPABASE_URL_PLACEHOLDER', 'NEXT_PUBLIC_SUPABASE_ANON_KEY': 'SUPABASE_ANON_KEY_PLACEHOLDER' };
+            const isLocal = window.location.hostname.includes('localhost') || window.location.hostname.includes('127.0.0.1');
             if (isLocal) {
-                try {
-                    const response = await fetch('.env?v=' + Date.now());
-                    if (response.ok) {
-                        const text = await response.text();
-                        text.split(/\r?\n/).forEach(line => {
-                            const parts = line.split('=');
-                            if (parts.length >= 2) {
-                                const k = parts[0].trim();
-                                const v = parts.slice(1).join('=').trim();
-                                if (k && v) env[k] = v;
-                            }
-                        });
-                    }
-                } catch (e) { }
+                try { const r = await fetch('.env?v=' + Date.now()); if (r.ok) { (await r.text()).split(/\r?\n/).forEach(l => { const p = l.split('='); if (p.length >= 2) env[p[0].trim()] = p.slice(1).join('=').trim(); }); } } catch (e) {}
             }
-
-            // Fallback to injected values
-            if (!env['TMDB_API_KEY'] || env['TMDB_API_KEY'] === 'TMDB_API_KEY_PLACEHOLDER') {
-                Object.assign(env, githubEnv);
-            }
-
-            tmdbKey = env['TMDB_API_KEY'];
-            if (env['NEXT_PUBLIC_SUPABASE_URL'] && env['NEXT_PUBLIC_SUPABASE_ANON_KEY']) {
+            ['TMDB_API_KEY', 'NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY'].forEach(k => { if(!env[k] || env[k].includes('PLACEHOLDER')) env[k] = githubEnv[k]; });
+            if (env['NEXT_PUBLIC_SUPABASE_URL'] && !env['NEXT_PUBLIC_SUPABASE_URL'].includes('PLACEHOLDER')) {
                 window.supabaseClient = supabase.createClient(env['NEXT_PUBLIC_SUPABASE_URL'], env['NEXT_PUBLIC_SUPABASE_ANON_KEY']);
-                
-                // Enable Realtime Listening
-                window.supabaseClient
-                    .channel('schema-db-changes')
-                    .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, payload => {
-                        console.log('Realtime update received:', payload);
-                        const currentMovieId = document.getElementById('bMovie').value;
-                        if (currentMovieId) fetchSeats();
-                        if (document.getElementById('occupancy').classList.contains('active')) refreshOccupancy();
-                    })
-                    .subscribe();
+                window.supabaseClient.channel('db-sync').on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, () => { if(document.getElementById('book').classList.contains('active')) fetchSeats(); }).subscribe();
             }
             return true;
         }
 
-        function hashString(str) {
-            let hash = 0;
-            for (let i = 0; i < str.length; i++) {
-                hash = ((hash << 5) - hash) + str.charCodeAt(i);
-                hash |= 0;
-            }
-            return Math.abs(hash);
-        }
-
-        async function fetchTMDBPoster(movieName) {
-            try {
-                const r = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${tmdbKey}&query=${encodeURIComponent(movieName)}`);
-                if (!r.ok) throw new Error("TMDB API Error: " + r.status);
-                const d = await r.json();
-                if (d.results && d.results[0] && d.results[0].poster_path) {
-                    return `https://image.tmdb.org/t/p/w500${d.results[0].poster_path}`;
-                }
-            } catch(e) { }
-            return `https://placehold.co/500x750/1a1a1a/ffffff?text=${encodeURIComponent(movieName)}`;
-        }
+        async function fetchTMDBPoster(n) { try { const r = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${env['TMDB_API_KEY']}&query=${encodeURIComponent(n)}`); const d = await r.json(); if (d.results?.[0]?.poster_path) return `https://image.tmdb.org/t/p/w500${d.results[0].poster_path}`; } catch(e) {} return `https://placehold.co/500x750/1a1a1a/ffffff?text=${encodeURIComponent(n)}`; }
 
         async function fetchMovies() {
             const loc = document.getElementById('webLoc').value;
-            showToast("Updating Live Movies...");
-            const liveCinema = {
-                "india": [
-                    { name: "Kalki 2898 AD", time: "10:30 AM", price: 250 },
-                    { name: "Pushpa 2: The Rule", time: "01:45 PM", price: 300 },
-                    { name: "Stree 2", time: "04:30 PM", price: 200 },
-                    { name: "Singham Again", time: "07:15 PM", price: 220 },
-                    { name: "Animal", time: "10:00 PM", price: 250 }
-                ],
-                "hindi": [
-                    { name: "Fighter", time: "11:00 AM", price: 200 },
-                    { name: "Shaitaan", time: "02:15 PM", price: 180 },
-                    { name: "Crew", time: "05:00 PM", price: 220 },
-                    { name: "Maidaan", time: "08:00 PM", price: 200 },
-                    { name: "Bade Miyan Chote Miyan", time: "11:00 PM", price: 250 }
-                ],
-                "tamil": [
-                    { name: "Leo", time: "10:00 AM", price: 250 },
-                    { name: "Vettaiyan", time: "01:15 PM", price: 220 },
-                    { name: "Raayan", time: "04:30 PM", price: 200 },
-                    { name: "Indian 2", time: "07:45 PM", price: 180 },
-                    { name: "Thangalaan", time: "11:00 PM", price: 150 }
-                ],
-                "telugu": [
-                    { name: "Devara", time: "10:00 AM", price: 300 },
-                    { name: "Salaar", time: "01:30 PM", price: 280 },
-                    { name: "Tillu Square", time: "04:45 PM", price: 200 },
-                    { name: "HanuMan", time: "08:00 PM", price: 180 },
-                    { name: "Guntur Kaaram", time: "11:15 PM", price: 250 }
-                ],
-                "malayalam": [
-                    { name: "Manjummel Boys", time: "10:00 AM", price: 180 },
-                    { name: "Premalu", time: "01:15 PM", price: 150 },
-                    { name: "Aavesham", time: "04:30 PM", price: 220 },
-                    { name: "Bramayugam", time: "07:45 PM", price: 180 },
-                    { name: "Aadujeevitham", time: "11:00 PM", price: 200 }
-                ]
-            };
-            const data = liveCinema[loc] || liveCinema["india"];
-            
-            const updatedShows = [];
-            for (let m of data) {
-                const poster = await fetchTMDBPoster(m.name);
-                updatedShows.push({
-                    id: hashString(m.name + m.time),
-                    name: m.name,
-                    timing: m.time,
-                    price: parseFloat(m.price).toFixed(2),
-                    img: poster || `https://placehold.co/300x450/1a1a1a/ffffff?text=${encodeURIComponent(m.name)}`,
-                    region: loc
-                });
-            }
-
-            if (window.Module && Module.ccall) {
-                try {
-                    updatedShows.forEach(s => {
-                        Module.ccall('addOrUpdateShow', null, ['number','string','string','number','string','string'], [parseInt(s.id), s.name, s.timing, parseFloat(s.price), s.img, s.region]);
-                    });
-                    Module.ccall('saveData', null, [], []);
-                } catch(e){ console.error("WASM Update Error:", e); }
-            }
-
-            if (window.supabaseClient) {
-                try {
-                    const syncData = updatedShows.map(s => ({
-                        id: parseInt(s.id),
-                        name: s.name,
-                        timing: s.timing,
-                        price: parseFloat(s.price)
-                    }));
-                    window.supabaseClient.from('shows').upsert(syncData).then(({error}) => {
-                        if (error) console.error("Supabase Shows Sync Error:", error);
-                    });
-                } catch(e) { console.error("Supabase Sync Exception:", e); }
-            }
-
-            refreshShows(); 
-            showToast("Movies Ready!", true);
-        }
-
-        function parse(t) {
-            if (t.startsWith("SHOW|")) { 
-                const p=t.split("|"); 
-                shows.push({id:p[1], name:p[2], timing:p[3], price:p[4], img:p[5], region:p[6]}); 
-            }
-            else if (t.startsWith("SEAT|")) { const p=t.split("|"); currentSeats.push({r:parseInt(p[1]), c:parseInt(p[2]), s:parseInt(p[3])}); }
-            else if (t.startsWith("SEAT_DONE|")) { renderSeatGrid(); }
-            else if (t.startsWith("REPORT|")) {
-                const p=t.split("|");
-                const b=document.getElementById('occBody');
-                if(!b) return;
-                b.innerHTML += `<tr>
-                    <td>#${p[1]}</td>
-                    <td>${p[2]}</td>
-                    <td>${p[3]}</td>
-                    <td><b>${p[5]} / ${p[4]}</b> Seats</td>
-                    <td style="color:${parseFloat(p[7]) > 50 ? 'var(--primary)' : 'var(--green)'}">${p[7]}%</td>
-                </tr>`;
-            }
-            else if (t.startsWith("QR_DATA|")) {
-                const qrContent = t.split("|")[1];
-                const qrDiv = document.getElementById("ticketQr");
-                if (qrDiv && qrContent !== "INVALID") {
-                    qrDiv.innerHTML = "";
-                    new QRCode(qrDiv, {
-                        text: qrContent,
-                        width: 100,
-                        height: 100,
-                        colorDark : "#000000",
-                        colorLight : "#ffffff",
-                        correctLevel : QRCode.CorrectLevel.H
-                    });
+            const movieData = { "india": ["Kalki 2898 AD", "Pushpa 2", "Stree 2", "Singham Again", "Animal"], "hindi": ["Fighter", "Shaitaan", "Crew", "Maidaan", "Bade Miyan 2"], "tamil": ["Leo", "Vettaiyan", "Raayan", "Indian 2", "Thangalaan"], "telugu": ["Devara", "Salaar", "Tillu Square", "HanuMan", "Guntur Kaaram"], "malayalam": ["Manjummel Boys", "Premalu", "Aavesham", "Bramayugam", "Aadujeevitham"] };
+            const slots = ["10:30 AM", "01:45 PM", "05:00 PM", "08:15 PM", "11:30 PM"];
+            const movieNames = movieData[loc] || movieData["india"];
+            if(window.Module?.ccall) Module.ccall('clearShows', null, [], []);
+            shows = [];
+            const cloudShows = [];
+            for (let n of movieNames) {
+                const img = await fetchTMDBPoster(n);
+                for(let t of slots) {
+                    const id = Math.abs(n.split('').reduce((a,b)=>{a=((a<<5)-a)+b.charCodeAt(0);return a&a},0) + t.split('').reduce((a,b)=>{a=((a<<5)-a)+b.charCodeAt(0);return a&a},0));
+                    const p = t.includes("05:00") ? 350 : t.includes("10:30") ? 180 : 250;
+                    const s = { id, name: n, timing: t, price: p.toFixed(2), img, region: loc };
+                    shows.push(s);
+                    cloudShows.push({ id, name: n, timing: t, price: p });
+                    if(window.Module?.ccall) Module.ccall('addOrUpdateShow', null, ['number','string','string','number','string','string'], [id, n, t, p, img, loc]);
                 }
             }
-            else if (t.startsWith("MSG|")) { showToast(t.replace("MSG|", ""), t.includes("Success")); }
-            else if (t.startsWith("SUCCESS_BOOKING|")) {
-                // Format: SUCCESS_BOOKING|ID|PRICE|NAME
-                // The seats are already booked in WASM, but let's ensure fetchSeats is triggered
-                // to keep the cloud-synced view consistent.
-                fetchSeats();
+            if(window.Module?.ccall) Module.ccall('saveData', null, [], []);
+            if(window.supabaseClient) {
+                try { await window.supabaseClient.from('shows').upsert(cloudShows); } catch(e) {}
             }
+            renderShowsOnGrid();
+            if(shows.length > 0) updateHero(shows[0]);
         }
 
-        window.Module = {
-            print: (t) => parse(t),
-            preRun: [function() { try { FS.mkdir('/data'); FS.mount(IDBFS, {}, '/data'); } catch(e){} }],
-            onRuntimeInitialized: async function() { 
-                await loadEnv(); 
-                FS.syncfs(true, function (err) { 
-                    if (!err) {
-                        if(window.Module.ccall) window.Module.ccall('loadData', null, [], []); 
-                        fetchMovies();
-                        showToast("System Ready", true);
-                    }
-                }); 
-            }
-        };
+        function updateHero(s) {
+            const bg = document.getElementById('heroBg'), cont = document.getElementById('heroContent');
+            bg.style.opacity = "0"; cont.classList.remove('show');
+            setTimeout(() => {
+                bg.style.backgroundImage = `url(${s.img})`; bg.style.opacity = "0.6";
+                document.getElementById('heroTitle').innerText = s.name;
+                document.getElementById('heroDesc').innerText = `Experience ${s.name} in premium IMAX. Exclusive slots available for the ${s.timing} show.`;
+                cont.classList.add('show');
+            }, 500);
+        }
 
-        async function renderShowsOnGrid() {
+        function renderShowsOnGrid() {
+            const g = document.getElementById('movieGrid'); if(!g) return; g.innerHTML = "";
             const loc = document.getElementById('webLoc').value;
-            const g = document.getElementById('movieGrid'); 
-            if(!g) return; 
-            g.innerHTML = "";
-
             const filtered = shows.filter(s => s.region === loc);
-
-            for (const s of filtered) {
-                // If the image is not set or is from TMDB, try to fetch it live if missing
-                let posterSrc = s.img;
-                if (!posterSrc || posterSrc === 'null' || posterSrc === 'undefined') {
-                    posterSrc = await fetchTMDBPoster(s.name);
-                }
-
-                const card = document.createElement('div');
-                card.className = 'movie-card';
-                card.innerHTML = `
-                    <div class="movie-poster-wrap">
-                        <span style="z-index: 0">${s.name}</span>
-                        <img src="${posterSrc}" class="movie-poster" alt="${s.name}" loading="lazy" 
-                             onerror="this.style.display='none';">
-                    </div>
-                    <div class="movie-info">
-                        <h3>${s.name}</h3>
-                        <p>🕒 ${s.timing}</p>
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:auto">
-                            <div class="price-tag"><span>₹</span>${s.price}</div>
-                            <button class="btn btn-primary" style="padding: 10px 20px" onclick="bookFromMovieTab(${s.id})">Book</button>
-                        </div>
-                    </div>
-                `;
-                g.appendChild(card);
-            }
+            const unique = []; const m = new Map();
+            for (const s of filtered) { if(!m.has(s.name)){ m.set(s.name, 1); unique.push(s); } }
+            unique.forEach(s => {
+                const c = document.createElement('div'); c.className = 'movie-card';
+                c.onclick = () => bookFromMovieTab(s.id);
+                c.innerHTML = `<div class="movie-poster-wrap"><img src="${s.img}" class="movie-poster" alt="${s.name}"></div><div class="movie-info"><h3>${s.name}</h3><p>From ₹${s.price}</p></div>`;
+                g.appendChild(c);
+            });
             populateBookDropdown();
         }
 
-        function refreshShows() {
-            shows = [];
-            if (window.Module && Module.ccall) {
-                Module.ccall('getShows', null, [], []);
-            }
-            // Increase timeout slightly for WASM output processing
-            setTimeout(() => renderShowsOnGrid(), 100);
-        }        
-        function bookFromMovieTab(id) { switchTab('book'); setTimeout(()=>{ document.getElementById('bMovie').value=id; fetchSeats(); }, 50); }
-        function populateBookDropdown() { const sel=document.getElementById('bMovie'); if(!sel) return; sel.innerHTML="<option value=''>-- Movie --</option>"; shows.forEach(s=>sel.innerHTML+=`<option value="${s.id}">${s.name}</option>`); }
+        function refreshShows() { shows = []; if (window.Module?.ccall) Module.ccall('getShows', null, [], []); setTimeout(() => renderShowsOnGrid(), 100); }        
+        function bookFromMovieTab(id) { 
+            const s = shows.find(x => x.id == id); if(!s) return;
+            switchTab('book'); 
+            setTimeout(()=>{ document.getElementById('bMovie').value=s.name; updateTimingOptions(); document.getElementById('bTiming').value = id; fetchSeats(); }, 150); 
+        }
+        function populateBookDropdown() { const sel=document.getElementById('bMovie'); if(!sel) return; sel.innerHTML="<option value=''>-- Select Movie --</option>"; [...new Set(shows.map(s => s.name))].forEach(n => sel.innerHTML+=`<option value="${n}">${n}</option>`); }
+        function updateTimingOptions() {
+            const n = document.getElementById('bMovie').value, c = document.getElementById('timingContainer'), s = document.getElementById('bTiming');
+            if(!n) { c.style.display = 'none'; return; }
+            s.innerHTML = "<option value=''>-- Choose Time --</option>";
+            shows.filter(x => x.name === n).forEach(x => s.innerHTML += `<option value="${x.id}">${x.timing} (₹${x.price})</option>`);
+            c.style.display = 'block';
+        }
+
         async function fetchSeats() { 
-            const id=document.getElementById('bMovie').value; 
-            if(!id) return; 
-            currentSeats=[]; 
-            selectedSeats=[]; 
-            updateSelectedSeatsInfo(); 
-            
-            // 1. Fetch Local Layout from WASM
+            const id = document.getElementById('bTiming').value; if(!id) return; 
+            currentSeats=[]; selectedSeats=[]; updateSelectedSeatsInfo(); 
             if(Module.ccall) Module.ccall('getSeatLayout', null, ['number'], [parseInt(id)]); 
-            
-            // 2. Fetch Live Bookings from Cloud to Sync Seats
             if(window.supabaseClient) {
                 try {
-                    const { data, error } = await window.supabaseClient
-                        .from('bookings')
-                        .select('seats')
-                        .eq('show_id', parseInt(id));
-                    
-                    if(!error && data) {
-                        data.forEach(booking => {
-                            const seats = booking.seats.split('-');
-                            seats.forEach(s => {
-                                const [r, c] = s.split(',').map(Number);
-                                // Mark as booked in the local view
-                                const seat = currentSeats.find(x => x.r === r && x.c === c);
-                                if(seat) seat.s = 1;
-                                else currentSeats.push({r, c, s: 1});
-                            });
-                        });
-                        renderSeatGrid();
-                    }
-                } catch(e) { console.error("Cloud Sync Error:", e); }
+                    const { data } = await window.supabaseClient.from('bookings').select('seats').eq('show_id', parseInt(id));
+                    if(data) data.forEach(b => { if(b.seats) b.seats.split('-').forEach(si => { const [r, c] = si.split(',').map(Number); const ex = currentSeats.find(x => x.r === r && x.c === c); if(ex) ex.s = 1; else currentSeats.push({r, c, s: 1}); }); });
+                    renderSeatGrid();
+                } catch(e) {}
             }
         }
         
         function renderSeatGrid() { 
-            const g=document.getElementById('seatGrid'); if(!g) return; h=""; 
-            for(let r=0; r<5; r++) { 
-                h+=`<div class="seat-row">`; 
-                for(let c=0; c<10; c++) { 
-                    const s=currentSeats.find(x=>x.r===r && x.c===c); 
-                    const seatLabel = `R${r+1} C${c+1}`;
-                    if(s && s.s===1) h+=`<div class="seat booked" data-label="${seatLabel} (Booked)"></div>`; 
-                    else {
-                        const isSelected = selectedSeats.some(x => x.r === r && x.c === c);
-                        h+=`<div class="seat ${isSelected ? 'selected' : ''}" onclick="toggleSeat(${r}, ${c}, this)" data-label="${seatLabel}"></div>`; 
-                    }
-                } 
-                h+=`</div>`; 
-            } 
+            const g=document.getElementById('seatGrid'); if(!g) return; let h=""; 
+            for(let r=0; r<5; r++) { h+=`<div class="seat-row">`; for(let c=0; c<10; c++) { const s=currentSeats.find(x=>x.r===r && x.c===c); if(s && s.s===1) h+=`<div class="seat booked"></div>`; else h+=`<div class="seat ${selectedSeats.some(x=>x.r===r&&x.c===c)?'selected':''}" onclick="toggleSeat(${r},${c},this)"></div>`; } h+=`</div>`; } 
             g.innerHTML=h; 
-        }
-
-        function updateSelectedSeatsInfo() {
-            const info = document.getElementById('selectedSeatsInfo');
-            if (!info) return;
-            if (selectedSeats.length === 0) {
-                info.innerText = "";
-            } else {
-                const seats = selectedSeats.map(s => `R${s.r + 1} C${s.c + 1}`).join(", ");
-                info.innerText = `Selected: ${seats}`;
-            }
         }
 
         function toggleSeat(r, c, el) { 
             const i=selectedSeats.findIndex(s=>s.r===r && s.c===c); 
-            if(i>-1) { 
-                selectedSeats.splice(i, 1); 
-                el.classList.remove('selected'); 
-            } else { 
-                if(selectedSeats.length>=20) return; 
-                selectedSeats.push({r, c}); 
-                el.classList.add('selected'); 
-            } 
+            if(i>-1) { selectedSeats.splice(i, 1); el.classList.remove('selected'); } 
+            else { if(selectedSeats.length>=20) return; selectedSeats.push({r, c}); el.classList.add('selected'); } 
             updateSelectedSeatsInfo();
+        }
+        function updateSelectedSeatsInfo() { const i = document.getElementById('selectedSeatsInfo'); if (i) i.innerText = selectedSeats.length === 0 ? "" : `Selected: ${selectedSeats.map(s => `R${s.r + 1}C${s.c + 1}`).join(", ")}`; }
+
+        function initiatePayment() {
+            if(!currentUser) { showToast("Please Log In"); return toggleAuthModal(); }
+            const id = document.getElementById('bTiming').value, n = document.getElementById('bName').value.trim(); 
+            if(!id || !n || selectedSeats.length===0) return showToast("Complete selection"); 
+            const s = shows.find(x => x.id == id); const total = (parseFloat(s.price) * selectedSeats.length).toFixed(2);
+            document.getElementById('payAmount').innerText = `₹${total}`;
+            const qr = document.getElementById('payQr'); qr.innerHTML = "";
+            new QRCode(qr, { text: `upi://pay?pa=cinebooking@upi&am=${total}`, width: 140, height: 140 });
+            document.getElementById('payment-modal').style.display = 'flex';
         }
         
         async function processBooking() { 
-            const id=document.getElementById('bMovie').value, n=document.getElementById('bName').value.trim(); 
-            if(!id || !n || selectedSeats.length===0) return showToast("Missing info!"); 
-            const btn = document.getElementById('bookBtn');
-            btn.disabled = true; btn.innerText = "Processing...";
-            const movie = shows.find(s => s.id == id);
-            const shortId = Math.random().toString(36).substring(2, 8).toUpperCase();
-            const seatList = selectedSeats.map(s=>`${s.r},${s.c}`).join('-');
+            const id = document.getElementById('bTiming').value, n = document.getElementById('bName').value.trim(); 
+            const btn = document.getElementById('payConfirmBtn'); btn.disabled = true; btn.innerText = "Submitting...";
+            const sid = Math.random().toString(36).toUpperCase().slice(2, 8);
+            const s = shows.find(x => x.id == id);
+            const sl = selectedSeats.map(x=>`${x.r},${x.c}`).join('-');
+            
             try {
-                if(window.supabaseClient) {
-                    const { data: syncData, error: syncErr } = await window.supabaseClient.from('bookings').insert({ 
-                        id_short: shortId, 
-                        show_id: parseInt(id), 
-                        customer_name: n, 
-                        num_seats: selectedSeats.length, 
-                        seats: seatList, 
-                        total_amount: parseFloat(movie.price) * selectedSeats.length 
-                    }).select();
-                    if(syncErr) throw syncErr;
+                if(window.supabaseClient) { 
+                    const { error } = await window.supabaseClient.from('bookings').insert({ id_short: sid, show_id: parseInt(id), customer_name: n, num_seats: selectedSeats.length, seats: sl, total_amount: parseFloat(s.price)*selectedSeats.length, user_email: currentUser.email, status: 'pending' }); 
+                    if(error) throw error;
                 }
-                if(Module.ccall) Module.ccall('bookTickets', null, ['number', 'string', 'number', 'string', 'string'], [parseInt(id), n, selectedSeats.length, seatList, shortId]);
-                document.getElementById('resId').innerHTML = shortId;
+                if(window.Module?.ccall) Module.ccall('bookTickets', null, ['number', 'string', 'number', 'string', 'string'], [parseInt(id), n, selectedSeats.length, sl, sid]);
+                
+                document.getElementById('payment-modal').style.display = 'none';
+                document.getElementById('resId').innerText = sid; 
                 document.getElementById('confirm-modal').style.display = 'flex';
-                selectedSeats = [];
-                updateSelectedSeatsInfo();
-            } catch(e) { console.error(e); showToast("Cloud Error"); } finally { btn.disabled = false; btn.innerText = "Confirm Booking"; }
+                selectedSeats = []; updateSelectedSeatsInfo();
+                showToast("Request Submitted!", true);
+                fetchBookingHistory(); 
+            } catch(e) { 
+                console.error("Supabase Error:", e);
+                showToast("Error: " + (e.message || "Database failure")); 
+            } finally { btn.disabled = false; btn.innerText = "Submit for Verification"; }
         }
 
-        async function doCancelTicket(shortId) {
-            if(!confirm("Are you sure you want to cancel this ticket?")) return;
-            showToast("Cancelling...");
+        async function fetchBookingHistory() {
+            if(!currentUser || !window.supabaseClient) { document.getElementById('historyGrid').innerHTML = '<p style="color:var(--muted); padding:20px;">Log in to see history.</p>'; return; }
+            const g = document.getElementById('historyGrid'); g.innerHTML = '<p style="color:var(--muted); padding:20px;">Syncing...</p>';
+            
             try {
-                const { data, error } = await window.supabaseClient.from('bookings').delete().eq('id_short', shortId);
+                const { data, error } = await window.supabaseClient.from('bookings').select('*').eq('user_email', currentUser.email).order('created_at', { ascending: false });
                 if(error) throw error;
-                if(window.Module && typeof window.Module.ccall === 'function') {
-                    window.Module.ccall('cancelBooking', null, ['string'], [shortId]);
-                }
-                showToast("Ticket Cancelled!", true);
-                document.getElementById('receiptArea').style.display = 'none';
-                if(typeof refreshOccupancy === 'function') refreshOccupancy();
-            } catch(e) { console.error(e); showToast("Cancellation Failed"); }
-        }
-
-        var html5QrCode = null;
-        async function toggleScanner() {
-            const readerDiv = document.getElementById('reader');
-            const ctrlBtn = document.getElementById('scanCtrlBtn');
-            if (readerDiv.style.display === 'none') {
-                readerDiv.style.display = 'block';
-                ctrlBtn.innerText = "Stop Scanning";
-                ctrlBtn.classList.replace('btn-primary', 'btn-danger');
-                if (!html5QrCode) {
-                    html5QrCode = new Html5Qrcode("reader");
-                }
-                const config = { fps: 10, qrbox: { width: 250, height: 250 } };
-                try {
-                    await html5QrCode.start({ facingMode: "environment" }, config, async (decodedText) => {
-                        console.log("QR Scanned:", decodedText);
-                        let ticketId = decodedText;
-                        if (decodedText.includes("CINEBOOKING-")) {
-                            ticketId = decodedText.split("-")[1];
-                        } else if (decodedText.includes("/v/")) {
-                            ticketId = decodedText.split("/v/")[1];
-                        }
-                        
-                        await stopScanner();
-                        switchTab('receipt');
-                        const inputEl = document.getElementById('vBookingId');
-                        if (inputEl) {
-                            inputEl.value = ticketId;
-                            fetchReceipt();
-                        }
-                    });
-                } catch (err) {
-                    console.error("Scanner error:", err);
-                    showToast("Camera Access Denied");
-                    await stopScanner();
-                }
-            } else {
-                await stopScanner();
-            }
-        }
-
-        async function stopScanner() {
-            const readerDiv = document.getElementById('reader');
-            const ctrlBtn = document.getElementById('scanCtrlBtn');
-            if(readerDiv) readerDiv.style.display = 'none';
-            if(ctrlBtn) {
-                ctrlBtn.innerText = "Start Scanning";
-                ctrlBtn.classList.replace('btn-danger', 'btn-primary');
-            }
-            if (html5QrCode) {
-                try {
-                    const state = html5QrCode.getState();
-                    if (state === 2 || state === 3) { // 2 = SCANNING, 3 = PAUSED
-                        await html5QrCode.stop();
-                    }
-                } catch (e) {
-                    console.warn("Stop scanner error:", e);
-                }
-            }
+                if(!data?.length) { g.innerHTML = '<p style="color:var(--muted); padding:20px;">No cloud records found.</p>'; return; }
+                g.innerHTML = "";
+                data.forEach(b => {
+                    const show = shows.find(x => x.id == b.show_id);
+                    const c = document.createElement('div'); c.className = "history-card";
+                    const statusColor = b.status === 'confirmed' ? 'var(--green)' : 'var(--primary)';
+                    c.onclick = () => { document.getElementById('vBookingId').value = b.id_short; fetchReceipt(); };
+                    c.innerHTML = `<div style="display:flex; justify-content:space-between"><h4>#${b.id_short}</h4><span style="color:${statusColor}; font-weight:800; font-size:0.7rem">${(b.status || 'PENDING').toUpperCase()}</span></div><p><b>${show?.name || 'VIP Movie'}</b></p><p>🕒 ${show?.timing || '---'}</p><p>💺 ${b.seats?.replace(/-/g, ', ') || 'Reserved'}</p><p style="margin-top:10px; color:var(--primary); font-weight:800">₹${parseFloat(b.total_amount).toFixed(2)}</p>`;
+                    g.appendChild(c);
+                });
+            } catch(e) { g.innerHTML = '<p style="color:var(--muted); padding:20px;">Cloud sync error.</p>'; }
         }
 
         async function fetchReceipt() { 
-            const inputId = document.getElementById('vBookingId').value.trim().toUpperCase(); 
-            if(!inputId) return showToast("Enter Ticket ID");
-
-            const searchBtn = document.querySelector("#receipt .btn-primary");
-            const originalText = searchBtn.innerText;
-            searchBtn.disabled = true;
-            searchBtn.innerText = "Searching...";
-
-            showToast("Searching Cloud...");
-            if(!window.supabaseClient) {
-                searchBtn.disabled = false;
-                searchBtn.innerText = originalText;
-                return showToast("Database Not Connected");
+            const bid = document.getElementById('vBookingId').value.trim().toUpperCase(); if(!bid) return showToast("Enter ID");
+            showToast("Searching...");
+            if(window.supabaseClient) {
+                try {
+                    const { data: b } = await window.supabaseClient.from('bookings').select('*').eq('id_short', bid).maybeSingle();
+                    if(b) return renderTicket(b);
+                } catch(err) {}
             }
-
-            try {
-                // Fetch booking first
-                const { data: booking, error: bErr } = await window.supabaseClient
-                    .from('bookings')
-                    .select('*')
-                    .eq('id_short', inputId)
-                    .maybeSingle();
-
-                if(bErr) throw bErr;
-                if(!booking) {
-                    showToast("Ticket Not Found");
-                    searchBtn.disabled = false;
-                    searchBtn.innerText = originalText;
-                    return;
-                }
-
-                // Fetch show details
-                const { data: show, error: sErr } = await window.supabaseClient
-                    .from('shows')
-                    .select('*')
-                    .eq('id', booking.show_id)
-                    .maybeSingle();
-
-                const cardHtml = `<div class="receipt-card" style="position: relative; border: 1px solid #eee;">
-                    <div style="position: absolute; top: 20px; right: 20px; color: #46D369; font-weight: 800; border: 2px solid #46D369; padding: 4px 10px; border-radius: 4px; transform: rotate(15deg); font-size: 0.8rem; text-transform: uppercase;">Verified</div>
-                    <div class="receipt-header">
-                        <h2 style="letter-spacing: 2px; color: #000;">CINEBOOKING</h2>
-                        <p style="font-size: 0.8rem; color: #666;">Official E-Ticket</p>
-                    </div>
-                    <div style="display: flex; gap: 30px; align-items: flex-start; margin-bottom: 20px;">
-                        <div style="flex: 1;">
-                            <div class="receipt-row"><span>Booking ID:</span><b>#${booking.id_short}</b></div>
-                            <div class="receipt-row"><span>Guest:</span><b>${booking.customer_name}</b></div>
-                            <div class="receipt-row"><span>Movie:</span><b>${show ? show.name : 'Unknown'}</b></div>
-                            <div class="receipt-row"><span>Time:</span><b>${show ? show.timing : '---'}</b></div>
-                            <div class="receipt-row"><span>Seats:</span><b>${booking.seats}</b></div>
-                            <div class="receipt-row" style="margin-top:15px; font-size:1.1rem; border-top: 1px solid #eee; padding-top: 10px;"><span>Amount Paid:</span><b>₹${booking.total_amount.toFixed(2)}</b></div>
-                        </div>
-                        <div id="ticketQr" style="padding: 5px; background: white; border: 1px solid #eee; border-radius: 4px;"></div>
-                    </div>
-                    <div style="text-align: center; border-top: 2px dashed #eee; padding-top: 20px;">
-                        <svg id="barcode"></svg>
-                    </div>
-                    <div style="display:flex; gap:10px; margin-top:20px;" class="no-print">
-                        <button class="btn btn-primary" style="flex:1" onclick="window.print()">Download PDF</button>
-                        <button class="btn btn-danger" style="flex:1" onclick="doCancelTicket('${booking.id_short}')">Cancel Ticket</button>
-                    </div>
-                </div>`;
-
-                document.getElementById('receiptArea').innerHTML = cardHtml;
-                document.getElementById('receiptArea').style.display = 'block';
-
-                // 1. Generate High-Quality QR Code
-                new QRCode(document.getElementById("ticketQr"), {
-                    text: `https://cinebooking.app/v/${booking.id_short}`,
-                    width: 110,
-                    height: 110,
-                    colorDark : "#000000",
-                    colorLight : "#ffffff",
-                    correctLevel : QRCode.CorrectLevel.H
-                });
-
-                // 2. Generate Real 1D Barcode (CODE128)
-                JsBarcode("#barcode", booking.id_short, {
-                    format: "CODE128",
-                    width: 2,
-                    height: 50,
-                    displayValue: true,
-                    fontSize: 14,
-                    lineColor: "#000"
-                });
-
-                showToast("Ticket Found!", true);
-            } catch(err) { 
-                console.error(err);
-                showToast("Search Failed"); 
-            } finally {
-                searchBtn.disabled = false;
-                searchBtn.innerText = originalText;
-            }
+            if(window.Module?.ccall) Module.ccall('viewBooking', null, ['string'], [bid]);
+            else showToast("Ticket Not Found");
         }
 
+        function renderTicket(b) {
+            const s = shows.find(x => x.id == b.show_id);
+            const ra = document.getElementById('receiptArea');
+            const isConfirmed = b.status === 'confirmed';
+            ra.innerHTML = `<div class="receipt-card"><div class="receipt-top"><h2>CINEBOOKING</h2><p>${isConfirmed ? 'VIP ADMISSION' : 'PAYMENT PENDING'}</p></div><div class="receipt-body"><div style="display:flex; justify-content:space-between; gap:20px"><div style="flex:1"><div class="receipt-row"><span>Ref</span><b>#${b.id_short || b.booking_id}</b></div><div class="receipt-row"><span>Guest</span><b>${b.customer_name}</b></div><div class="receipt-row"><span>Movie</span><b>${s?.name || 'VIP Feature'}</b></div><div class="receipt-row"><span>Time</span><b>${s?.timing || '---'}</b></div><div class="receipt-row"><span>Seats</span><b>${b.seats?.replace(/-/g, ', ') || 'Reserved'}</b></div><div class="receipt-row" style="margin-top:15px; border-top:1px solid #eee; padding-top:15px"><span>Paid</span><b style="color:var(--primary)!important">₹${parseFloat(b.total_amount).toFixed(2)}</b></div></div><div id="tqr" style="padding:5px; background:#fff; border-radius:8px; opacity:${isConfirmed?1:0.2}"></div></div><div style="text-align:center; margin-top:20px"><svg id="bc"></svg></div>${!isConfirmed ? '<p style="color:red!important; font-weight:800; text-align:center; margin-top:10px">WAITING FOR ADMIN VERIFICATION</p>' : ''}<div style="display:flex; gap:10px; margin-top:20px" class="no-print"><button class="btn btn-primary" style="flex:1" onclick="window.print()" ${!isConfirmed?'disabled':''}>Print</button><button class="btn btn-outline" style="flex:1" onclick="doCancelTicket('${b.id_short || b.booking_id}')">Cancel</button></div></div></div>`;
+            ra.style.display = 'block'; ra.scrollIntoView({ behavior: 'smooth' });
+            
+            // Dynamic QR link detection for GitHub Pages or Localhost
+            const baseUrl = window.location.origin + window.location.pathname;
+            new QRCode(document.getElementById("tqr"), { text: baseUrl + "?ticket=" + (b.id_short || b.booking_id), width: 90, height: 90 });
+            JsBarcode("#bc", (b.id_short || b.booking_id), { format: "CODE128", width: 2, height: 40, displayValue: true });
+            showToast(isConfirmed ? "Admission Found" : "Status: Pending", true);
+        }
+
+        async function doCancelTicket(id) {
+            if(!confirm("Cancel?")) return;
+            try {
+                if(window.supabaseClient) await window.supabaseClient.from('bookings').delete().eq('id_short', id);
+                if(Module.ccall) Module.ccall('cancelBooking', null, ['string'], [id]);
+                showToast("Admission Revoked", true); document.getElementById('receiptArea').style.display = 'none'; fetchBookingHistory();
+            } catch(e) { showToast("Failed"); }
+        }
 
         async function refreshOccupancy() { 
             const b=document.getElementById('occBody'); if(!b) return; b.innerHTML=""; 
-            
-            // 1. Sync cloud bookings to WASM for accurate reporting
-            if(window.supabaseClient && window.Module && Module.ccall) {
+            const app = document.getElementById('approvalBody'); app.innerHTML = "";
+
+            if(window.supabaseClient && window.Module?.ccall) {
                 try {
-                    const { data, error } = await window.supabaseClient.from('bookings').select('show_id, seats');
-                    if(!error && data) {
-                        // Clear all seats in WASM first
-                        shows.forEach(s => {
-                            for(let r=0; r<5; r++) {
-                                for(let c=0; c<10; c++) {
-                                    Module.ccall('markSeat', null, ['number','number','number','number'], [parseInt(s.id), r, c, 0]);
-                                }
+                    const { data, error } = await window.supabaseClient.from('bookings').select('*');
+                    if(error) throw error;
+                    if(data) {
+                        shows.forEach(s => { for(let r=0; r<5; r++) for(let c=0; c<10; c++) Module.ccall('markSeat', null, ['number','number','number','number'], [parseInt(s.id), r, c, 0]); });
+                        let pendingCount = 0;
+                        data.forEach(bk => { 
+                            if(bk.seats) bk.seats.split('-').forEach(s => { const [r, c] = s.split(',').map(Number); Module.ccall('markSeat', null, ['number','number','number','number'], [parseInt(bk.show_id), r, c, 1]); }); 
+                            if(bk.status === 'pending') {
+                                pendingCount++;
+                                app.innerHTML += `<tr><td>#${bk.id_short}</td><td><b>${bk.customer_name}</b></td><td>${bk.show_id}</td><td>₹${bk.total_amount}</td><td><button class="btn btn-primary" style="padding:8px 16px; font-size:0.7rem" onclick="verifyPayment('${bk.id_short}')">Verify</button></td></tr>`;
                             }
                         });
-                        // Mark seats from cloud bookings
-                        data.forEach(booking => {
-                            const seats = booking.seats.split('-');
-                            seats.forEach(s => {
-                                const [r, c] = s.split(',').map(Number);
-                                Module.ccall('markSeat', null, ['number','number','number','number'], [parseInt(booking.show_id), r, c, 1]);
-                            });
-                        });
+                        if(pendingCount === 0) app.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--muted); padding: 40px;">No pending payments</td></tr>';
                     }
-                } catch(e) { console.error("Occupancy Sync Error:", e); }
+                } catch(e) { console.error("Admin Refresh Error:", e); }
             }
-
             if(Module.ccall) Module.ccall('getOccupancyReport', null, [], []); 
         }
 
-        async function syncFromCloud() {
-            if(!confirm("Sync from Terminal?")) return;
+        async function verifyPayment(bid) {
+            if(!confirm("Confirm Payment for #" + bid + "?")) return;
             try {
-                const r1 = await fetch('shows.dat?c=' + Date.now()), r2 = await fetch('bookings.dat?c=' + Date.now());
-                if(!r1.ok || !r2.ok) throw new Error();
-                FS.writeFile('/data/shows_v3.dat', new Uint8Array(await r1.arrayBuffer()));
-                FS.writeFile('/data/bookings_v3.dat', new Uint8Array(await r2.arrayBuffer()));
-                FS.syncfs(false, () => location.reload());
-            } catch(e) { showToast("Sync Fail"); }
+                const { error } = await window.supabaseClient.from('bookings').update({ status: 'confirmed' }).eq('id_short', bid);
+                if(error) throw error;
+                showToast("Payment Verified!", true);
+                refreshOccupancy();
+            } catch(e) { showToast("Verification failed"); }
+        }
+
+        function parse(t) {
+            if (t.startsWith("SHOW|")) { const p=t.split("|"); shows.push({id:p[1], name:p[2], timing:p[3], price:p[4], img:p[5], region:p[6]}); }
+            else if (t.startsWith("SEAT|")) { const p=t.split("|"); currentSeats.push({r:parseInt(p[1]), c:parseInt(p[2]), s:parseInt(p[3])}); }
+            else if (t.startsWith("SEAT_DONE|")) { renderSeatGrid(); }
+            else if (t.startsWith("REPORT|")) {
+                const p=t.split("|"), b=document.getElementById('occBody'); if(!b) return;
+                const perc = parseFloat(p[7]);
+                b.innerHTML += `<tr><td>#${p[1].substring(0,4)}</td><td><b>${p[2]}</b></td><td>${p[3]}</td><td><b>${p[5]} / ${p[4]}</b></td><td style="color:${perc > 80 ? 'var(--primary)' : 'var(--green)'}; font-weight:800">${perc.toFixed(0)}%</td></tr>`;
+            }
+            else if (t.startsWith("RECEIPT|")) {
+                const p=t.split("|");
+                renderTicket({ id_short: p[1], customer_name: p[2], show_id: parseInt(p[3]), num_seats: parseInt(p[5]), total_amount: parseFloat(p[6]), seats: p[7], status: 'confirmed' });
+            }
+            else if (t.startsWith("MSG|")) { showToast(t.replace("MSG|", ""), t.includes("Success")); }
+        }
+
+        window.Module = {
+            print: (t) => parse(t),
+            onRuntimeInitialized: async function() { await loadEnv(); if(Module.ccall) { Module.ccall('loadData', null, [], []); fetchMovies(); showToast("Theater System Online", true); } }
+        };
+
+        function toggleAuthModal() {
+            if(currentUser) { if(confirm("Log Out?")) { currentUser = null; document.getElementById('userStateBtn').innerText = "Log In"; document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none'); if(document.getElementById('occupancy').classList.contains('active')) switchTab('movies'); showToast("Logged Out", true); } } 
+            else { document.getElementById('authEmail').value = ""; document.getElementById('authPass').value = ""; document.getElementById('auth-modal').style.display = 'flex'; }
+        }
+        function setAuthMode(m) { authMode = m; document.getElementById('tab-login').classList.toggle('active', m==='login'); document.getElementById('tab-register').classList.toggle('active', m==='register'); }
+        
+        async function processAuth() {
+            const e = document.getElementById('authEmail').value.trim(), p = document.getElementById('authPass').value.trim(); 
+            if(!e || !p) return showToast("Enter credentials");
+            if(!window.supabaseClient) return showToast("DB Not Connected");
+
+            try {
+                if(authMode === 'register') {
+                    const { error } = await window.supabaseClient.from('user_accounts').insert({ email: e, password: p, role: 'user' });
+                    if(error) throw error;
+                    showToast("Account Created! Please Log In.", true);
+                    setAuthMode('login');
+                } else {
+                    const { data, error } = await window.supabaseClient.from('user_accounts').select('*').eq('email', e).eq('password', p).maybeSingle();
+                    if(error || !data) throw { message: "Invalid Credentials" };
+                    currentUser = { email: data.email, role: data.role };
+                    
+                    if(currentUser) {
+                        if(currentUser.role === 'admin') document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'block');
+                        document.getElementById('userStateBtn').innerText = "Log Out";
+                        document.getElementById('auth-modal').style.display = 'none';
+                        showToast("Welcome " + currentUser.email, true);
+                        if(document.getElementById('receipt').classList.contains('active')) fetchBookingHistory();
+                    }
+                }
+            } catch(err) {
+                console.error("Auth Error:", err);
+                showToast(err.message || "Login failed");
+            }
+        }
+
+        async function syncFromCloud() { if(!confirm("Master Sync?")) return; try { const r1 = await fetch('shows.dat?c=' + Date.now()), r2 = await fetch('bookings.dat?c=' + Date.now()); if(r1.ok && r2.ok) { FS.writeFile('/data/shows_v4.dat', new Uint8Array(await r1.arrayBuffer())); FS.writeFile('/data/bookings_v4.dat', new Uint8Array(await r2.arrayBuffer())); FS.syncfs(false, () => location.reload()); } } catch(e) {} }
+        async function stopScanner() { if (html5QrCode?.getState() > 1) await html5QrCode.stop(); }
+        async function toggleScanner() {
+            const r = document.getElementById('reader'), b = document.getElementById('scanCtrlBtn');
+            if (r.style.display === 'none') {
+                r.style.display = 'block'; b.innerText = "Close"; b.classList.replace('btn-primary', 'btn-danger');
+                if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
+                try { await html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, async (t) => { let id = t; if (t.includes("?ticket=")) id = new URL(t).searchParams.get("ticket"); await stopScanner(); switchTab('receipt'); document.getElementById('vBookingId').value = id; fetchReceipt(); }); } catch (err) { showToast("Camera Fail"); }
+            } else { r.style.display = 'none'; b.innerText = "Open Camera"; b.classList.replace('btn-danger', 'btn-primary'); await stopScanner(); }
         }
     </script>
     <script async src="index.js"></script>
