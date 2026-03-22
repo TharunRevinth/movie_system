@@ -26,7 +26,10 @@ jobs:
           node-version: '20'
 
       - name: Build Project
-        run: npm run build
+        run: |
+          echo "Checking variables presence..."
+          if [ -z "$TMDB_API_KEY" ]; then echo "TMDB_API_KEY is MISSING"; else echo "TMDB_API_KEY is present"; fi
+          npm run build
         env:
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
