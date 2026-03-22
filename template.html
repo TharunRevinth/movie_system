@@ -25,7 +25,6 @@
             --green: #10B981; 
             --shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
             --container-padding: clamp(1rem, 5vw, 4rem);
-            
             --screen-color: #ffffff;
             --screen-glow: rgba(255, 255, 255, 0.4);
             --seat-base: #222;
@@ -419,20 +418,24 @@
         async function fetchBookingHistory() {
             if(!currentUser || !window.supabaseClient) return;
             const g = document.getElementById('historyGrid'); g.innerHTML = "Syncing...";
-            const { data } = await window.supabaseClient.from('bookings').select('*').eq('user_email', currentUser.email).order('created_at', { ascending: false });
-            if(!data?.length) { g.innerHTML = "No history"; return; } g.innerHTML = "";
-            data.forEach(b => {
-                const show = shows.find(x => x.id == b.show_id);
-                const c = document.createElement('div'); c.className = "history-card"; c.onclick = () => { document.getElementById('vBookingId').value = b.id_short; fetchReceipt(); };
-                c.innerHTML = `<h4>#${b.id_short} - ${(b.status||'PENDING').toUpperCase()}</h4><p>${show?.name || 'Movie'}</p><p>₹${b.total_amount}</p>`; g.appendChild(c);
-            });
+            try {
+                const { data } = await window.supabaseClient.from('bookings').select('*').eq('user_email', currentUser.email).order('created_at', { ascending: false });
+                if(!data?.length) { g.innerHTML = "No history"; return; } g.innerHTML = "";
+                data.forEach(b => {
+                    const show = shows.find(x => x.id == b.show_id);
+                    const c = document.createElement('div'); c.className = "history-card"; c.onclick = () => { document.getElementById('vBookingId').value = b.id_short; fetchReceipt(); };
+                    c.innerHTML = `<h4>#${b.id_short} - ${(b.status||'PENDING').toUpperCase()}</h4><p>${show?.name || 'Movie'}</p><p>₹${b.total_amount}</p>`; g.appendChild(c);
+                });
+            } catch(e) { g.innerHTML = "Error loading history"; }
         }
 
         async function fetchReceipt() { 
             const bid = document.getElementById('vBookingId').value.trim().toUpperCase(); if(!bid) return;
             if(window.supabaseClient) {
-                const { data: b } = await window.supabaseClient.from('bookings').select('*').eq('id_short', bid).maybeSingle();
-                if(b) return renderTicket(b);
+                try {
+                    const { data: b } = await window.supabaseClient.from('bookings').select('*').eq('id_short', bid).maybeSingle();
+                    if(b) return renderTicket(b);
+                } catch(e) {}
             }
             showToast("Not Found");
         }
@@ -444,63 +447,56 @@
             new QRCode(document.getElementById("tqr"), { text: window.location.origin + window.location.pathname + "?ticket=" + b.id_short, width: 100, height: 100 });
         }
 
-        async function doCancelTicket(id) { if(!confirm("Cancel?")) return; await window.supabaseClient.from('bookings').delete().eq('id_short', id); showToast("Cancelled", true); document.getElementById('receiptArea').style.display = 'none'; fetchBookingHistory(); }
+        async function doCancelTicket(id) { if(!confirm("Cancel?")) return; try { await window.supabaseClient.from('bookings').delete().eq('id_short', id); showToast("Cancelled", true); document.getElementById('receiptArea').style.display = 'none'; fetchBookingHistory(); } catch(e) { showToast("Failed"); } }
 
         async function refreshOccupancy() { 
             const b=document.getElementById('occBody'), a=document.getElementById('approvalBody'); b.innerHTML=""; a.innerHTML="";
             if(window.supabaseClient) {
-                const { data } = await window.supabaseClient.from('bookings').select('*');
-                if(data) data.forEach(bk => { if(bk.status === 'pending') a.innerHTML += `<tr><td>#${bk.id_short}</td><td>${bk.customer_name}</td><td>${bk.show_id}</td><td>₹${bk.total_amount}</td><td><button class="btn btn-primary" onclick="verifyPayment('${bk.id_short}')">Verify</button></td></tr>`; });
+                try {
+                    const { data } = await window.supabaseClient.from('bookings').select('*');
+                    if(data) data.forEach(bk => { if(bk.status === 'pending') a.innerHTML += `<tr><td>#${bk.id_short}</td><td>${bk.customer_name}</td><td>${bk.show_id}</td><td>₹${bk.total_amount}</td><td><button class="btn btn-primary" onclick="verifyPayment('${bk.id_short}')">Verify</button></td></tr>`; });
+                } catch(e) {}
             }
             if(Module.ccall) Module.ccall('getOccupancyReport', null, [], []); 
         }
 
-        async function verifyPayment(bid) { await window.supabaseClient.from('bookings').update({ status: 'confirmed' }).eq('id_short', bid); showToast("Verified", true); refreshOccupancy(); }
+        async function verifyPayment(bid) { try { await window.supabaseClient.from('bookings').update({ status: 'confirmed' }).eq('id_short', bid); showToast("Verified", true); refreshOccupancy(); } catch(e) { showToast("Error"); } }
 
         function parse(t) {
             if (t.startsWith("SHOW|")) { const p=t.split("|"); shows.push({id:p[1], name:p[2], timing:p[3], price:p[4], img:p[5], region:p[6]}); }
             else if (t.startsWith("SEAT|")) { const p=t.split("|"); currentSeats.push({r:parseInt(p[1]), c:parseInt(p[2]), s:parseInt(p[3])}); }
             else if (t.startsWith("SEAT_DONE|")) { renderSeatGrid(); }
-            else if (t.startsWith("REPORT|")) { const p=t.split("|"); document.getElementById('occBody').innerHTML += `<tr><td>#${p[1]}</td><td>${p[2]}</td><td>${p[3]}</td><td>${p[5]}/${p[4]}</td><td>${p[7]}%</td></tr>`; }
+            else if (t.startsWith("REPORT|")) { const p=t.split("|"); const b=document.getElementById('occBody'); if(b) b.innerHTML += `<tr><td>#${p[1]}</td><td>${p[2]}</td><td>${p[3]}</td><td>${p[5]}/${p[4]}</td><td>${p[7]}%</td></tr>`; }
             else if (t.startsWith("MSG|")) { showToast(t.replace("MSG|", ""), t.includes("Success")); }
         }
 
         window.Module = { print: (t) => parse(t), onRuntimeInitialized: async function() { await loadEnv(); if(Module.ccall) Module.ccall('loadData', null, [], []); fetchMovies(); } };
 
-        function toggleAuthModal() { if(currentUser) { currentUser = null; document.getElementById('userStateBtn').innerText = "Log In"; document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none'); } else { document.getElementById('auth-modal').style.display = 'flex'; } }
+        function toggleAuthModal() { if(currentUser) { currentUser = null; document.getElementById('userStateBtn').innerText = "Log In"; document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none'); } else { document.getElementById('authEmail').value = ""; document.getElementById('authPass').value = ""; document.getElementById('auth-modal').style.display = 'flex'; } }
         function setAuthMode(m) { authMode = m; document.getElementById('tab-login').classList.toggle('active', m==='login'); document.getElementById('tab-register').classList.toggle('active', m==='register'); }
         async function processAuth() {
             const e = document.getElementById('authEmail').value.trim(), p = document.getElementById('authPass').value.trim();
             if(!e || !p) return showToast("Enter credentials");
-            if(!window.supabaseClient) return showToast("Database Not Connected");
-
+            if(!window.supabaseClient) return showToast("DB Not Connected");
             try {
                 if(authMode === 'register') {
                     const { error } = await window.supabaseClient.from('user_accounts').insert({ email: e, password: p, role: 'user' });
                     if(error) throw error;
-                    showToast("Account Created! Log In now.", true);
-                    setAuthMode('login');
+                    showToast("Created! Log In", true); setAuthMode('login');
                 } else {
                     const { data, error } = await window.supabaseClient.from('user_accounts').select('*').eq('email', e).eq('password', p).maybeSingle();
                     if(error) throw error;
-                    if(!data) throw { message: "Invalid Email or Password" };
-                    
-                    currentUser = data;
-                    document.getElementById('userStateBtn').innerText = "Log Out";
+                    if(!data) throw { message: "Invalid Credentials" };
+                    currentUser = data; document.getElementById('userStateBtn').innerText = "Log Out";
                     if(data.role === 'admin') document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'block');
-                    document.getElementById('auth-modal').style.display = 'none';
-                    showToast("Welcome " + e, true);
-                    if(document.getElementById('receipt').classList.contains('active')) fetchBookingHistory();
+                    document.getElementById('auth-modal').style.display = 'none'; showToast("Welcome " + e, true);
                 }
-            } catch(err) {
-                console.error("Auth Error:", err);
-                showToast(err.message || "Auth failed", false);
-            }
+            } catch(err) { showToast(err.message || "Login failed"); }
         }
         async function stopScanner() { if (html5QrCode?.getState() > 1) await html5QrCode.stop(); }
         async function toggleScanner() {
             const r = document.getElementById('reader'), b = document.getElementById('scanCtrlBtn');
-            if (r.style.display === 'none') { r.style.display = 'block'; b.innerText = "Close"; if (!html5QrCode) html5QrCode = new Html5Qrcode("reader"); try { await html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, async (t) => { await stopScanner(); switchTab('receipt'); document.getElementById('vBookingId').value = t; fetchReceipt(); }); } catch (e) {} }
+            if (r.style.display === 'none') { r.style.display = 'block'; b.innerText = "Close"; if (!html5QrCode) html5QrCode = new Html5Qrcode("reader"); try { await html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, async (t) => { await stopScanner(); switchTab('receipt'); document.getElementById('vBookingId').value = t; fetchReceipt(); }); } catch (e) { showToast("Camera Error"); } }
             else { r.style.display = 'none'; b.innerText = "Open Camera"; await stopScanner(); }
         }
     </script>
