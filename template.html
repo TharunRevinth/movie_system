@@ -545,7 +545,29 @@
         async function stopScanner() { if (html5QrCode?.getState() > 1) await html5QrCode.stop(); }
         async function toggleScanner() {
             const r = document.getElementById('reader'), b = document.getElementById('scanCtrlBtn');
-            if (r.style.display === 'none') { r.style.display = 'block'; b.innerText = "Close"; if (!html5QrCode) html5QrCode = new Html5Qrcode("reader"); try { await html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, async (t) => { await stopScanner(); switchTab('receipt'); document.getElementById('vBookingId').value = t; fetchReceipt(); }); } catch (e) { showToast("Camera Error"); } }
+            if (r.style.display === 'none') {
+                r.style.display = 'block'; b.innerText = "Close";
+                if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
+                try {
+                    await html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, async (t) => {
+                        let id = t;
+                        // Intelligent ID Extraction: if it's a URL, get the 'ticket' parameter
+                        if (t.includes('?ticket=')) {
+                            const urlParams = new URLSearchParams(t.split('?')[1]);
+                            id = urlParams.get('ticket');
+                        } else if (t.includes('/')) {
+                            // Fallback for different URL structures
+                            id = t.split('/').pop().split('?')[0];
+                        }
+                        
+                        console.log("Extracted ID from Scan:", id);
+                        await stopScanner();
+                        switchTab('receipt');
+                        document.getElementById('vBookingId').value = id;
+                        fetchReceipt();
+                    });
+                } catch (e) { showToast("Camera Error"); }
+            }
             else { r.style.display = 'none'; b.innerText = "Open Camera"; await stopScanner(); }
         }
     </script>
