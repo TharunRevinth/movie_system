@@ -470,9 +470,32 @@
         function toggleAuthModal() { if(currentUser) { currentUser = null; document.getElementById('userStateBtn').innerText = "Log In"; document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none'); } else { document.getElementById('auth-modal').style.display = 'flex'; } }
         function setAuthMode(m) { authMode = m; document.getElementById('tab-login').classList.toggle('active', m==='login'); document.getElementById('tab-register').classList.toggle('active', m==='register'); }
         async function processAuth() {
-            const e = document.getElementById('authEmail').value, p = document.getElementById('authPass').value;
-            if(authMode === 'register') { await window.supabaseClient.from('user_accounts').insert({ email: e, password: p, role: 'user' }); setAuthMode('login'); }
-            else { const { data } = await window.supabaseClient.from('user_accounts').select('*').eq('email', e).eq('password', p).maybeSingle(); if(data) { currentUser = data; document.getElementById('userStateBtn').innerText = "Log Out"; if(data.role === 'admin') document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'block'); document.getElementById('auth-modal').style.display = 'none'; } }
+            const e = document.getElementById('authEmail').value.trim(), p = document.getElementById('authPass').value.trim();
+            if(!e || !p) return showToast("Enter credentials");
+            if(!window.supabaseClient) return showToast("Database Not Connected");
+
+            try {
+                if(authMode === 'register') {
+                    const { error } = await window.supabaseClient.from('user_accounts').insert({ email: e, password: p, role: 'user' });
+                    if(error) throw error;
+                    showToast("Account Created! Log In now.", true);
+                    setAuthMode('login');
+                } else {
+                    const { data, error } = await window.supabaseClient.from('user_accounts').select('*').eq('email', e).eq('password', p).maybeSingle();
+                    if(error) throw error;
+                    if(!data) throw { message: "Invalid Email or Password" };
+                    
+                    currentUser = data;
+                    document.getElementById('userStateBtn').innerText = "Log Out";
+                    if(data.role === 'admin') document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'block');
+                    document.getElementById('auth-modal').style.display = 'none';
+                    showToast("Welcome " + e, true);
+                    if(document.getElementById('receipt').classList.contains('active')) fetchBookingHistory();
+                }
+            } catch(err) {
+                console.error("Auth Error:", err);
+                showToast(err.message || "Auth failed", false);
+            }
         }
         async function stopScanner() { if (html5QrCode?.getState() > 1) await html5QrCode.stop(); }
         async function toggleScanner() {
