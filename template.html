@@ -299,13 +299,7 @@
         var shows = [], selectedSeats = [], currentSeats = [], env = {}, currentUser = null, authMode = 'login', html5QrCode = null;
         window.supabaseClient = null;
 
-        function showToast(m, s=false) { 
-            const t=document.getElementById("toast"); 
-            if(!t)return; 
-            t.innerText=m + " [vDebug-1.0]"; 
-            t.className="show"; 
-            setTimeout(()=>t.className="", 3000); 
-        }
+        function showToast(m, s=false) { const t=document.getElementById("toast"); if(!t)return; t.innerText=m; t.className="show"; setTimeout(()=>t.className="", 3000); }
         function closeConfirmModal() { document.getElementById('confirm-modal').style.display = 'none'; switchTab('movies'); }
         
         async function switchTab(tabId) { 
@@ -333,10 +327,8 @@
             }
             ['TMDB_API_KEY', 'NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY'].forEach(k => { if(!env[k] || env[k].includes('PLACEHOLDER')) env[k] = githubEnv[k]; });
             if (env['NEXT_PUBLIC_SUPABASE_URL'] && env['NEXT_PUBLIC_SUPABASE_ANON_KEY']) {
-                console.log("Initializing Supabase...");
                 window.supabaseClient = supabase.createClient(env['NEXT_PUBLIC_SUPABASE_URL'], env['NEXT_PUBLIC_SUPABASE_ANON_KEY']);
-                console.log("Supabase Client Ready.");
-            } else { console.warn("Missing Supabase Keys!"); }
+            }
             return true;
         }
 
@@ -484,17 +476,10 @@
                 await loadEnv(); 
                 if(Module.ccall) Module.ccall('loadData', null, [], []); 
                 fetchMovies(); 
-
-                // --- QR Code Auto-Link Logic ---
                 const urlParams = new URLSearchParams(window.location.search);
                 const ticketId = urlParams.get('ticket');
                 if (ticketId) {
-                    console.log("Auto-loading ticket:", ticketId);
-                    setTimeout(() => {
-                        switchTab('receipt');
-                        document.getElementById('vBookingId').value = ticketId;
-                        fetchReceipt();
-                    }, 1000); // Small delay to ensure DB is ready
+                    setTimeout(() => { switchTab('receipt'); document.getElementById('vBookingId').value = ticketId; fetchReceipt(); }, 1000);
                 }
             } 
         };
@@ -502,45 +487,23 @@
         function toggleAuthModal() { if(currentUser) { currentUser = null; document.getElementById('userStateBtn').innerText = "Log In"; document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none'); } else { document.getElementById('authEmail').value = ""; document.getElementById('authPass').value = ""; document.getElementById('auth-modal').style.display = 'flex'; } }
         function setAuthMode(m) { authMode = m; document.getElementById('tab-login').classList.toggle('active', m==='login'); document.getElementById('tab-register').classList.toggle('active', m==='register'); }
         async function processAuth() {
-            const e = document.getElementById('authEmail').value.trim();
-            const p = document.getElementById('authPass').value.trim();
-            console.log(`Auth Triggered: Mode=[${authMode}], Email=[${e}], Pass=[${p}]`);
-            
+            const e = document.getElementById('authEmail').value.trim(), p = document.getElementById('authPass').value.trim();
             if(!e || !p) return showToast("Enter credentials");
-            if(!window.supabaseClient) {
-                console.error("Critical: window.supabaseClient is null");
-                return showToast("Database Connection Missing");
-            }
-
+            if(!window.supabaseClient) return showToast("DB Not Connected");
             try {
                 if(authMode === 'register') {
-                    console.log("Registering user in DB...");
-                    const { data, error } = await window.supabaseClient.from('user_accounts').insert({ email: e, password: p, role: 'user' }).select();
+                    const { error } = await window.supabaseClient.from('user_accounts').insert({ email: e, password: p, role: 'user' }).select();
                     if(error) throw error;
-                    console.log("Registered Successfully:", data);
-                    showToast("Account Created!", true); setAuthMode('login');
+                    showToast("Created! Log In", true); setAuthMode('login');
                 } else {
-                    console.log("Executing Login Query...");
                     const { data, error } = await window.supabaseClient.from('user_accounts').select('*').eq('email', e).eq('password', p).maybeSingle();
-                    console.log("Query Response:", { data, error });
-                    
                     if(error) throw error;
-                    if(!data) {
-                        console.warn("No Match: Incorrect email or password.");
-                        throw { message: "Invalid Credentials" };
-                    }
-                    
-                    currentUser = data;
-                    console.log("Login Success. User role:", data.role);
-                    document.getElementById('userStateBtn').innerText = "Log Out";
+                    if(!data) throw { message: "Invalid Credentials" };
+                    currentUser = data; document.getElementById('userStateBtn').innerText = "Log Out";
                     if(data.role === 'admin') document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'block');
-                    document.getElementById('auth-modal').style.display = 'none';
-                    showToast("Welcome " + e, true);
+                    document.getElementById('auth-modal').style.display = 'none'; showToast("Welcome " + e, true);
                 }
-            } catch(err) {
-                console.error("Final Auth Error:", err);
-                showToast(err.message || "Auth Error");
-            }
+            } catch(err) { showToast(err.message || "Login failed"); }
         }
         async function stopScanner() { if (html5QrCode?.getState() > 1) await html5QrCode.stop(); }
         async function toggleScanner() {
@@ -551,20 +514,8 @@
                 try {
                     await html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, async (t) => {
                         let id = t;
-                        // Intelligent ID Extraction: if it's a URL, get the 'ticket' parameter
-                        if (t.includes('?ticket=')) {
-                            const urlParams = new URLSearchParams(t.split('?')[1]);
-                            id = urlParams.get('ticket');
-                        } else if (t.includes('/')) {
-                            // Fallback for different URL structures
-                            id = t.split('/').pop().split('?')[0];
-                        }
-                        
-                        console.log("Extracted ID from Scan:", id);
-                        await stopScanner();
-                        switchTab('receipt');
-                        document.getElementById('vBookingId').value = id;
-                        fetchReceipt();
+                        if (t.includes('?ticket=')) id = new URLSearchParams(t.split('?')[1]).get('ticket');
+                        await stopScanner(); switchTab('receipt'); document.getElementById('vBookingId').value = id; fetchReceipt();
                     });
                 } catch (e) { showToast("Camera Error"); }
             }
