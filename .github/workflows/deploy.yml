@@ -12,9 +12,6 @@ permissions:
 
 jobs:
   deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -27,8 +24,13 @@ jobs:
 
       - name: Build Project
         run: |
-          echo "Checking variables presence..."
-          if [ -z "$TMDB_API_KEY" ]; then echo "TMDB_API_KEY is MISSING"; else echo "TMDB_API_KEY is present"; fi
+          echo "Checking secret injection..."
+          if [ -z "$TMDB_API_KEY" ]; then 
+            echo "::error::TMDB_API_KEY is MISSING! Ensure it is in Settings -> Secrets and variables -> Actions -> Repository Secrets";
+            exit 1;
+          else 
+            echo "Secrets found. Proceeding with build.";
+          fi
           npm run build
         env:
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
