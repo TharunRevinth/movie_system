@@ -124,16 +124,28 @@ void displayOccupancyReport() {
         if(s_idx == -1) continue;
 
         int booked_seats = 0;
+        int layout[ROWS][COLS] = {0};
         for(int b=0; b<num_bookings; b++) {
             if(bookings[b].show_id == pairs[p].sid && strcmp(bookings[b].show_date, pairs[p].date) == 0) {
                 booked_seats += bookings[b].num_seats;
+                for(int i=0; i<bookings[b].num_seats; i++) {
+                    layout[bookings[b].seat_rows[i]][bookings[b].seat_cols[i]] = 1;
+                }
             }
         }
 
         int total = ROWS * COLS;
         float perc = ((float)booked_seats / total) * 100.0;
-        printf("%-12s | %-15.15s | %-10s | %-6d | %-6d | %-6d | %.1f%%\n", 
-               pairs[p].date, shows[s_idx].movie_name, shows[s_idx].timing, total, booked_seats, total-booked_seats, perc);
+        printf("\n" BOLD MAG " %s | %s | %s " RESET "\n", pairs[p].date, shows[s_idx].movie_name, shows[s_idx].timing);
+        printf(" Load: %d/%d (%.1f%%)\n", booked_seats, total, perc);
+        
+        // Mini grid
+        printf(" "); for(int c=0; c<COLS; c++) printf("%d", c); printf("\n");
+        for(int r=0; r<ROWS; r++) {
+            printf("%d", r);
+            for(int c=0; c<COLS; c++) printf("%s", layout[r][c] ? RED"X"RESET : GRN"O"RESET);
+            printf("\n");
+        }
     }
 
     // Also list shows with 0 bookings for "Today"
@@ -151,25 +163,80 @@ void displayOccupancyReport() {
     }
 }
 
+void displaySeatLayout(int sid, const char* date) {
+    int s_idx = -1;
+    for(int i=0; i<num_shows; i++) if(shows[i].show_id == sid) s_idx = i;
+    if(s_idx == -1) return;
+
+    // Temporary layout for this show and date
+    int layout[ROWS][COLS] = {0};
+    for(int b=0; b<num_bookings; b++) {
+        if(bookings[b].show_id == sid && strcmp(bookings[b].show_date, date) == 0) {
+            for(int i=0; i<bookings[b].num_seats; i++) {
+                layout[bookings[b].seat_rows[i]][bookings[b].seat_cols[i]] = 1;
+            }
+        }
+    }
+
+    printf("\n" BOLD CYN "  SEAT LAYOUT (Screen Top)" RESET "\n");
+    printf("    "); for(int c=0; c<COLS; c++) printf("%d ", c); printf("\n");
+    for(int r=0; r<ROWS; r++) {
+        printf(" %d: ", r);
+        for(int c=0; c<COLS; c++) {
+            if(layout[r][c] == 1) printf(RED "X " RESET);
+            else printf(GRN "O " RESET);
+        }
+        printf("\n");
+    }
+    printf(GRN "O" RESET "=Avail, " RED "X" RESET "=Booked\n");
+}
+
 void bookTicket() {
     int sid; char date[16], name[64];
     printf("\n" CYN "ENTER BOOKING DETAILS" RESET "\n");
     printf(" Show ID: "); scanf("%d", &sid);
     printf(" Date (YYYY-MM-DD): "); scanf("%s", date);
-    printf(" Customer Name: "); scanf("%s", name);
-
+    
     int s_idx = -1;
     for(int i=0; i<num_shows; i++) if(shows[i].show_id == sid) s_idx = i;
     if(s_idx == -1) { printf(RED "Invalid Show ID!\n" RESET); return; }
 
+    displaySeatLayout(sid, date);
+
+    printf(" Customer Name: "); scanf("%s", name);
     int count; printf(" Number of Seats: "); scanf("%d", &count);
     
-    // Check available space
-    int current_booked = 0;
-    for(int b=0; b<num_bookings; b++) 
-        if(bookings[b].show_id == sid && strcmp(bookings[b].show_date, date) == 0) current_booked += bookings[b].num_seats;
-    
-    if(current_booked + count > 50) { printf(RED "Not enough seats available!\n" RESET); return; }
+    if(count > 20) { printf(RED "Max 20 seats per booking!\n" RESET); return; }
+
+    int r_list[20], c_list[20];
+    for(int i=0; i<count; i++) {
+        while(1) {
+            printf(" Seat %d (Row Col 0-4 0-9): ", i+1);
+            if(scanf("%d %d", &r_list[i], &c_list[i]) != 2) {
+                while(getchar() != '\n'); continue;
+            }
+            if(r_list[i]<0 || r_list[i]>=ROWS || c_list[i]<0 || c_list[i]>=COLS) {
+                printf(RED " Invalid coordinates!\n" RESET); continue;
+            }
+            
+            // Check double booking
+            int taken = 0;
+            for(int b=0; b<num_bookings; b++) {
+                if(bookings[b].show_id == sid && strcmp(bookings[b].show_date, date) == 0) {
+                    for(int j=0; j<bookings[b].num_seats; j++) {
+                        if(bookings[b].seat_rows[j] == r_list[i] && bookings[b].seat_cols[j] == c_list[i]) taken = 1;
+                    }
+                }
+            }
+            // Check if user already selected this seat in current loop
+            for(int j=0; j<i; j++) {
+                if(r_list[j] == r_list[i] && c_list[j] == c_list[i]) taken = 1;
+            }
+
+            if(taken) { printf(RED " Seat already booked! Choose another.\n" RESET); }
+            else break;
+        }
+    }
 
     // Generate Booking
     if(num_bookings >= MAX_BOOKINGS) return;
@@ -178,6 +245,10 @@ void bookTicket() {
     strcpy(nb->customer_name, name);
     nb->show_id = sid;
     nb->num_seats = count;
+    for(int i=0; i<count; i++) {
+        nb->seat_rows[i] = r_list[i];
+        nb->seat_cols[i] = c_list[i];
+    }
     strcpy(nb->show_date, date);
     strcpy(nb->status, "confirmed");
     nb->total_amount = shows[s_idx].price * count;
@@ -196,8 +267,11 @@ void viewTicket() {
             printf("\n" BOLD MAG "RECEIPT FOR #%s" RESET "\n", id);
             printf(" Customer: %s\n", bookings[i].customer_name);
             printf(" Date: %s\n", bookings[i].show_date);
-            printf(" Seats: %d\n", bookings[i].num_seats);
-            printf(" Total: ₹%.2f\n", bookings[i].total_amount);
+            printf(" Seats (%d): ", bookings[i].num_seats);
+            for(int j=0; j<bookings[i].num_seats; j++) {
+                printf("R%dC%d%s", bookings[i].seat_rows[j], bookings[i].seat_cols[j], (j==bookings[i].num_seats-1)?"":", ");
+            }
+            printf("\n Total: ₹%.2f\n", bookings[i].total_amount);
             return;
         }
     }
