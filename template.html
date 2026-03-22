@@ -257,7 +257,13 @@
         </div>
 
         <div id="occupancy" class="tab-content">
-            <div class="header"><h2>Admin Console</h2><button class="btn btn-outline" onclick="refreshOccupancy()">Refresh</button></div>
+            <div class="header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap: wrap; gap: 15px;">
+                <h2>Admin Console</h2>
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <select id="admDate" style="width: auto; min-width: 140px; padding: 8px 12px;" onchange="refreshOccupancy()"></select>
+                    <button class="btn btn-outline" style="padding: 8px 16px;" onclick="refreshOccupancy()">Refresh</button>
+                </div>
+            </div>
             <div class="box" style="margin-top: 20px;">
                 <h3 style="margin-bottom: 15px;">Approvals</h3>
                 <div class="table-wrapper"><table><thead><tr><th>Ref</th><th>Guest</th><th>Show ID</th><th>Amount</th><th>Action</th></tr></thead><tbody id="approvalBody"></tbody></table></div>
@@ -303,8 +309,8 @@
         function showToast(m, s=false) { const t=document.getElementById("toast"); if(!t)return; t.innerText=m; t.className="show"; setTimeout(()=>t.className="", 3000); }
         function closeConfirmModal() { document.getElementById('confirm-modal').style.display = 'none'; switchTab('movies'); }
         
-        function populateDates() {
-            const sel = document.getElementById('bDate'); if(!sel) return; sel.innerHTML = "";
+        function populateDates(elementId) {
+            const sel = document.getElementById(elementId); if(!sel) return; sel.innerHTML = "";
             for(let i=0; i<7; i++) {
                 const d = new Date(); d.setDate(d.getDate() + i);
                 const iso = d.toISOString().split('T')[0];
@@ -323,9 +329,12 @@
             const items = document.querySelectorAll('.nav-links .nav-item');
             const map = { 'movies': 0, 'book': 1, 'scanner': 2, 'receipt': 3 };
             if(map[tabId] !== undefined && items[map[tabId]]) items[map[tabId]].classList.add('active');
-            if(tabId === 'occupancy' && document.getElementById('adminTabBtn')) document.getElementById('adminTabBtn').classList.add('active');
+            if(tabId === 'occupancy' && document.getElementById('adminTabBtn')) {
+                document.getElementById('adminTabBtn').classList.add('active');
+                if(!document.getElementById('admDate').innerHTML) populateDates('admDate');
+            }
             if(tabId === 'movies') refreshShows();
-            else if(tabId === 'book') { populateDates(); populateBookDropdown(); }
+            else if(tabId === 'book') { populateDates('bDate'); populateBookDropdown(); }
             else if(tabId === 'receipt') fetchBookingHistory();
             else if(tabId === 'occupancy') refreshOccupancy();
         }
@@ -462,14 +471,14 @@
         async function doCancelTicket(id) { if(!confirm("Cancel?")) return; try { await window.supabaseClient.from('bookings').delete().eq('id_short', id); showToast("Cancelled", true); document.getElementById('receiptArea').style.display = 'none'; fetchBookingHistory(); } catch(e) { showToast("Failed"); } }
 
         async function refreshOccupancy() { 
-            const b=document.getElementById('occBody'), a=document.getElementById('approvalBody'); 
-            if(!b || !a) return;
+            const b=document.getElementById('occBody'), a=document.getElementById('approvalBody'), dt=document.getElementById('admDate').value; 
+            if(!b || !a || !dt) return;
             b.innerHTML="<tr><td colspan='5' style='text-align:center; padding:20px;'>Syncing Cloud Data...</td></tr>"; 
             a.innerHTML="";
 
             if(window.supabaseClient && window.Module?.ccall) {
                 try {
-                    const { data, error } = await window.supabaseClient.from('bookings').select('*');
+                    const { data, error } = await window.supabaseClient.from('bookings').select('*').eq('show_date', dt);
                     if(error) throw error;
                     
                     // 1. Reset all seats in WASM first
@@ -481,9 +490,9 @@
                         }
                     });
 
-                    // 2. Sync all database bookings into WASM and fill approvals
+                    // 2. Sync database bookings for THIS DATE into WASM and fill approvals
                     if(data) {
-                        b.innerHTML = ""; // Clear loading message
+                        b.innerHTML = ""; 
                         let pendingCount = 0;
                         data.forEach(bk => {
                             if(bk.seats) {
