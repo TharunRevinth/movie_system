@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>CineBooking | VIP Cinema System</title>
+    <title>CineBooking | Cinema System</title>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/uuid/8.3.2/uuid.min.js"></script>
@@ -187,7 +187,7 @@
         <div id="heroBg" class="hero-bg"></div>
         <div class="hero-overlay"></div>
         <div class="hero-content" id="heroContent">
-            <h1 id="heroTitle">VIP Cinema Experience</h1>
+            <h1 id="heroTitle">Cinema Experience</h1>
             <p id="heroDesc">Select a movie from our premium collection below.</p>
             <div style="display:flex; flex-wrap: wrap; gap:12px;">
                 <button class="btn btn-primary" onclick="switchTab('book')">Book Now</button>
@@ -442,7 +442,8 @@
 
         function renderTicket(b) {
             const s = shows.find(x => x.id == b.show_id), ra = document.getElementById('receiptArea'), conf = b.status === 'confirmed';
-            ra.innerHTML = `<div class="receipt-card"><div class="receipt-top"><h2>CINEBOOKING</h2><p>${conf?'VIP ADMISSION':'PENDING'}</p></div><div class="receipt-body"><div class="receipt-row"><span>Ref</span><b>#${b.id_short}</b></div><div class="receipt-row"><span>Guest</span><b>${b.customer_name}</b></div><div class="receipt-row"><span>Movie</span><b>${s?.name || 'Movie'}</b></div><div class="receipt-row"><span>Time</span><b>${s?.timing || '---'}</b></div><div id="tqr" style="text-align:center; margin-top:15px; opacity:${conf?1:0.2}"></div><div style="display:flex; gap:10px; margin-top:20px"><button class="btn btn-primary" onclick="window.print()" ${!conf?'disabled':''}>Print</button><button class="btn btn-outline" onclick="doCancelTicket('${b.id_short}')">Cancel</button></div></div></div>`;
+            ra.innerHTML = `<div class="receipt-card"><div class="receipt-top"><h2>CINEBOOKING</h2><p>${conf?'ADMISSION':'PENDING'}</p></div>
+<div class="receipt-body"><div class="receipt-row"><span>Ref</span><b>#${b.id_short}</b></div><div class="receipt-row"><span>Guest</span><b>${b.customer_name}</b></div><div class="receipt-row"><span>Movie</span><b>${s?.name || 'Movie'}</b></div><div class="receipt-row"><span>Time</span><b>${s?.timing || '---'}</b></div><div id="tqr" style="text-align:center; margin-top:15px; opacity:${conf?1:0.2}"></div><div style="display:flex; gap:10px; margin-top:20px"><button class="btn btn-primary" onclick="window.print()" ${!conf?'disabled':''}>Print</button><button class="btn btn-outline" onclick="doCancelTicket('${b.id_short}')">Cancel</button></div></div></div>`;
             ra.style.display = 'block'; ra.scrollIntoView();
             new QRCode(document.getElementById("tqr"), { text: window.location.origin + window.location.pathname + "?ticket=" + b.id_short, width: 100, height: 100 });
         }
