@@ -478,7 +478,26 @@
             else if (t.startsWith("MSG|")) { showToast(t.replace("MSG|", ""), t.includes("Success")); }
         }
 
-        window.Module = { print: (t) => parse(t), onRuntimeInitialized: async function() { await loadEnv(); if(Module.ccall) Module.ccall('loadData', null, [], []); fetchMovies(); } };
+        window.Module = { 
+            print: (t) => parse(t), 
+            onRuntimeInitialized: async function() { 
+                await loadEnv(); 
+                if(Module.ccall) Module.ccall('loadData', null, [], []); 
+                fetchMovies(); 
+
+                // --- QR Code Auto-Link Logic ---
+                const urlParams = new URLSearchParams(window.location.search);
+                const ticketId = urlParams.get('ticket');
+                if (ticketId) {
+                    console.log("Auto-loading ticket:", ticketId);
+                    setTimeout(() => {
+                        switchTab('receipt');
+                        document.getElementById('vBookingId').value = ticketId;
+                        fetchReceipt();
+                    }, 1000); // Small delay to ensure DB is ready
+                }
+            } 
+        };
 
         function toggleAuthModal() { if(currentUser) { currentUser = null; document.getElementById('userStateBtn').innerText = "Log In"; document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none'); } else { document.getElementById('authEmail').value = ""; document.getElementById('authPass').value = ""; document.getElementById('auth-modal').style.display = 'flex'; } }
         function setAuthMode(m) { authMode = m; document.getElementById('tab-login').classList.toggle('active', m==='login'); document.getElementById('tab-register').classList.toggle('active', m==='register'); }
